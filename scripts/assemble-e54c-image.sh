@@ -56,7 +56,10 @@ mkdir -p "$tmp_stage/boot/extlinux" "$tmp_stage/boot/dtbs/rockchip"
 cp "$KERNEL_RELEASE_DIR/boot/Image" "$tmp_stage/boot/Image"
 cp "$KERNEL_DTB" "$tmp_stage/boot/dtbs/rockchip/"
 
-CMDLINE="$(cat "$REPO_ROOT/assets/reference/radxa/cmdline" | sed -E 's@root=UUID=[^ ]+@root=LABEL=rootfs@')"
+# Keep bootargs intentionally short and put root first.
+# Some U-Boot extlinux paths appear to truncate long APPEND lines.
+CMDLINE_DEFAULT="root=PARTLABEL=rootfs rootfstype=ext4 rootwait rw console=ttyFIQ0,1500000n8 earlycon console=tty1"
+CMDLINE="${KERNEL_CMDLINE:-$CMDLINE_DEFAULT}"
 cat >"$tmp_stage/boot/extlinux/extlinux.conf" <<EOF
 DEFAULT custom
 MENU TITLE U-Boot menu
@@ -106,11 +109,20 @@ tar-in $ROOTFS_TAR /
 tar-in $BOOT_TAR /
 tar-in $MODULES_TAR /
 upload $CONFIG_FILE /config/config.txt
+mkdir-p /boot/efi/extlinux
+mkdir-p /boot/efi/boot/dtbs/rockchip
+upload $tmp_stage/boot/extlinux/extlinux.conf /boot/efi/extlinux/extlinux.conf
+upload $tmp_stage/boot/Image /boot/efi/boot/Image
+upload $KERNEL_DTB /boot/efi/boot/dtbs/rockchip/rk3588s-radxa-e54c.dtb
 EOF
 
 # Radxa E54C bootloader offsets from vendor setup script:
 #   idbloader @ LBA 64 (32 KiB), u-boot.itb @ LBA 16384 (8 MiB)
 dd conv=notrunc,fsync if="$UBOOT_DIR/idbloader.img" of="$IMAGE_PATH" bs=512 seek=64 status=none
 dd conv=notrunc,fsync if="$UBOOT_DIR/u-boot.itb" of="$IMAGE_PATH" bs=512 seek=16384 status=none
+
+# Match Radxa GPT partition attributes:
+# attribute flags 0x4 (bit 2) set on p2 and p3.
+/usr/sbin/sgdisk --attributes=2:set:2 --attributes=3:set:2 "$IMAGE_PATH" >/dev/null
 
 echo "Image assembled: $IMAGE_PATH"
