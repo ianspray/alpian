@@ -109,8 +109,20 @@ cat >"$ROOTFS_DIR/etc/network/interfaces" <<'EOF'
 auto lo
 iface lo inet loopback
 
-auto eth0
-iface eth0 inet dhcp
+# Radxa E54C uses DSA port names from DT:
+# wan, lan1, lan2, lan3
+# Bring up DHCP on all physical ports so any connected port can provide uplink.
+auto wan
+iface wan inet dhcp
+
+auto lan1
+iface lan1 inet dhcp
+
+auto lan2
+iface lan2 inet dhcp
+
+auto lan3
+iface lan3 inet dhcp
 EOF
 
 # Serial-only login for headless operation.
