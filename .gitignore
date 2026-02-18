@@ -1,0 +1,10 @@
+build/
+work/
+src/radxa-kernel/
+src/radxa-kernel-e54c/
+*.img
+*.img.xz
+*.iso
+*.tar.gz
+*.tar.xz
+

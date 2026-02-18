@@ -1,0 +1,116 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+export PATH="$PATH:/usr/sbin:/sbin"
+export TMPDIR="${TMPDIR:-/tmp}"
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/tmp}"
+export LIBGUESTFS_BACKEND="${LIBGUESTFS_BACKEND:-direct}"
+export LIBGUESTFS_TMPDIR="${LIBGUESTFS_TMPDIR:-/tmp}"
+export LIBGUESTFS_CACHEDIR="${LIBGUESTFS_CACHEDIR:-/tmp}"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+IMAGE_PATH="${IMAGE_PATH:-$REPO_ROOT/build/e54c-alpine-custom.img}"
+IMAGE_SIZE="${IMAGE_SIZE:-8G}"
+ROOTFS_TAR="${ROOTFS_TAR:-$REPO_ROOT/build/alpine-rootfs.tar}"
+UBOOT_DIR="${UBOOT_DIR:-$REPO_ROOT/assets/reference/u-boot}"
+CONFIG_FILE="${CONFIG_FILE:-$REPO_ROOT/assets/reference/radxa/config.txt}"
+
+if [ -z "${KERNEL_RELEASE_DIR:-}" ]; then
+  KERNEL_RELEASE_DIR="$(ls -dt "$REPO_ROOT"/build/kernel-artifacts/* 2>/dev/null | head -n1 || true)"
+fi
+
+if [ -z "$KERNEL_RELEASE_DIR" ] || [ ! -d "$KERNEL_RELEASE_DIR" ]; then
+  echo "KERNEL_RELEASE_DIR is not set and no kernel artifacts were found." >&2
+  exit 1
+fi
+
+for req in "$ROOTFS_TAR" "$UBOOT_DIR/idbloader.img" "$UBOOT_DIR/u-boot.itb" "$KERNEL_RELEASE_DIR/boot/Image"; do
+  if [ ! -e "$req" ]; then
+    echo "Missing required input: $req" >&2
+    exit 1
+  fi
+done
+
+KERNEL_DTB="$KERNEL_RELEASE_DIR/boot/dtbs/rockchip/rk3588s-radxa-e54c.dtb"
+if [ ! -f "$KERNEL_DTB" ]; then
+  echo "Missing required DTB: $KERNEL_DTB" >&2
+  exit 1
+fi
+
+mkdir -p "$(dirname "$IMAGE_PATH")"
+truncate -s "$IMAGE_SIZE" "$IMAGE_PATH"
+
+tmp_stage="$(mktemp -d)"
+trap 'rm -rf "$tmp_stage"' EXIT
+
+if [ ! -f "$CONFIG_FILE" ]; then
+  CONFIG_FILE="$tmp_stage/config.txt"
+  cat >"$CONFIG_FILE" <<'EOF'
+# rsetup config placeholder
+EOF
+fi
+
+mkdir -p "$tmp_stage/boot/extlinux" "$tmp_stage/boot/dtbs/rockchip"
+cp "$KERNEL_RELEASE_DIR/boot/Image" "$tmp_stage/boot/Image"
+cp "$KERNEL_DTB" "$tmp_stage/boot/dtbs/rockchip/"
+
+CMDLINE="$(cat "$REPO_ROOT/assets/reference/radxa/cmdline" | sed -E 's@root=UUID=[^ ]+@root=LABEL=rootfs@')"
+cat >"$tmp_stage/boot/extlinux/extlinux.conf" <<EOF
+DEFAULT custom
+MENU TITLE U-Boot menu
+PROMPT 1
+TIMEOUT 50
+
+LABEL custom
+  MENU LABEL Alpine Linux (custom E54C kernel)
+  LINUX /boot/Image
+  FDT /boot/dtbs/rockchip/rk3588s-radxa-e54c.dtb
+  APPEND ${CMDLINE}
+EOF
+
+BOOT_TAR="$tmp_stage/boot.tar"
+MODULES_TAR="$tmp_stage/modules.tar"
+tar -C "$tmp_stage" -cf "$BOOT_TAR" boot
+
+if [ -d "$KERNEL_RELEASE_DIR/rootfs/lib/modules" ]; then
+  tar -C "$KERNEL_RELEASE_DIR/rootfs" -cf "$MODULES_TAR" lib/modules
+else
+  tar -cf "$MODULES_TAR" --files-from /dev/null
+fi
+
+guestfish <<EOF
+add-drive $IMAGE_PATH
+run
+part-init /dev/sda gpt
+part-add /dev/sda p 32768 65535
+part-add /dev/sda p 65536 679935
+part-add /dev/sda p 679936 -34
+part-set-name /dev/sda 1 config
+part-set-name /dev/sda 2 efi
+part-set-name /dev/sda 3 rootfs
+part-set-gpt-type /dev/sda 1 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+part-set-gpt-type /dev/sda 2 C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+part-set-gpt-type /dev/sda 3 0FC63DAF-8483-4772-8E79-3D69D8477DE4
+mkfs vfat /dev/sda1 label:config
+mkfs vfat /dev/sda2 label:efi
+mkfs ext4 /dev/sda3 label:rootfs
+mount /dev/sda3 /
+mkdir-p /boot
+mkdir-p /boot/efi
+mkdir-p /config
+mount /dev/sda2 /boot/efi
+mount /dev/sda1 /config
+tar-in $ROOTFS_TAR /
+tar-in $BOOT_TAR /
+tar-in $MODULES_TAR /
+upload $CONFIG_FILE /config/config.txt
+EOF
+
+# Radxa E54C bootloader offsets from vendor setup script:
+#   idbloader @ LBA 64 (32 KiB), u-boot.itb @ LBA 16384 (8 MiB)
+dd conv=notrunc,fsync if="$UBOOT_DIR/idbloader.img" of="$IMAGE_PATH" bs=512 seek=64 status=none
+dd conv=notrunc,fsync if="$UBOOT_DIR/u-boot.itb" of="$IMAGE_PATH" bs=512 seek=16384 status=none
+
+echo "Image assembled: $IMAGE_PATH"
