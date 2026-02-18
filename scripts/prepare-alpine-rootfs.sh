@@ -16,6 +16,10 @@ ALPINE_PACKAGES="${ALPINE_PACKAGES:-alpine-base alpine-conf openssh}"
 SERIAL_TTY="${SERIAL_TTY:-ttyFIQ0}"
 SERIAL_BAUD="${SERIAL_BAUD:-1500000}"
 ROOT_AUTHORIZED_KEYS_FILE="${ROOT_AUTHORIZED_KEYS_FILE:-}"
+ROOT_PASSWORD_HASH="${ROOT_PASSWORD_HASH:-\$6\$e54c\$AvSUgOTK89YCT1RHhqB/SfsK3J5itEI.1QMfd2fRmcUgYla4h4UUBMbCOKPm89stfDAoWvWCA8E0zamUvTN0A/}"
+ROOT_PASSWORD_PLAIN="${ROOT_PASSWORD_PLAIN:-}"
+ROOT_PASSWORD_SALT="${ROOT_PASSWORD_SALT:-e54c}"
+ENABLE_BOOT_NET_BANNER="${ENABLE_BOOT_NET_BANNER:-1}"
 
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
@@ -173,6 +177,101 @@ if [ -n "$ROOT_AUTHORIZED_KEYS_FILE" ]; then
   chmod 700 "$ROOTFS_DIR/root/.ssh"
   cp "$ROOT_AUTHORIZED_KEYS_FILE" "$ROOTFS_DIR/root/.ssh/authorized_keys"
   chmod 600 "$ROOTFS_DIR/root/.ssh/authorized_keys"
+fi
+
+# Optional root password setup for serial bring-up.
+# To disable password login in future builds, set ROOT_PASSWORD_HASH="" and ROOT_PASSWORD_PLAIN="".
+if [ -n "$ROOT_PASSWORD_PLAIN" ]; then
+  require_cmd openssl
+  ROOT_PASSWORD_HASH="$(openssl passwd -6 -salt "$ROOT_PASSWORD_SALT" "$ROOT_PASSWORD_PLAIN")"
+fi
+if [ -n "$ROOT_PASSWORD_HASH" ] && [ -f "$ROOTFS_DIR/etc/shadow" ]; then
+  tmp_shadow="$(mktemp)"
+  awk -F: -v OFS=: -v hash="$ROOT_PASSWORD_HASH" '($1=="root"){$2=hash}1' \
+    "$ROOTFS_DIR/etc/shadow" >"$tmp_shadow"
+  mv "$tmp_shadow" "$ROOTFS_DIR/etc/shadow"
+  chmod 640 "$ROOTFS_DIR/etc/shadow"
+fi
+
+if [ "$ENABLE_BOOT_NET_BANNER" = "1" ]; then
+  mkdir -p "$ROOTFS_DIR/usr/local/sbin"
+  cat >"$ROOTFS_DIR/usr/local/sbin/show-net-addrs" <<EOF
+#!/bin/sh
+set -eu
+
+SERIAL_TTY="${SERIAL_TTY}"
+WAIT_SECONDS="\${NET_ADDR_WAIT_SECONDS:-40}"
+
+collect_addrs() {
+  ip -o -4 addr show scope global 2>/dev/null | awk '{print "IPv4 " \$2 " " \$4}'
+  ip -o -6 addr show scope global 2>/dev/null | awk '{print "IPv6 " \$2 " " \$4}'
+}
+
+start_ts=\$(date +%s)
+addrs=""
+while :; do
+  addrs="\$(collect_addrs | sort -u || true)"
+  [ -n "\$addrs" ] && break
+  now=\$(date +%s)
+  [ \$((now - start_ts)) -ge "\$WAIT_SECONDS" ] && break
+  sleep 1
+done
+
+issue_base_file="/etc/issue.base"
+[ -f "\$issue_base_file" ] || cp /etc/issue "\$issue_base_file" 2>/dev/null || true
+{
+  if [ -f "\$issue_base_file" ]; then
+    cat "\$issue_base_file"
+  else
+    echo "Alpine Linux"
+  fi
+  echo
+  echo "Network addresses:"
+  if [ -n "\$addrs" ]; then
+    echo "\$addrs"
+  else
+    echo "No global DHCP address acquired yet."
+  fi
+} >/etc/issue
+
+{
+  echo
+  echo "=== Network Addresses ==="
+  if [ -n "\$addrs" ]; then
+    echo "\$addrs"
+  else
+    echo "No global DHCP address acquired yet."
+  fi
+  echo "========================="
+  echo
+} >/run/network-addresses.banner
+
+cat /run/network-addresses.banner >/dev/console 2>/dev/null || true
+if [ -c "/dev/\$SERIAL_TTY" ]; then
+  cat /run/network-addresses.banner >"/dev/\$SERIAL_TTY" 2>/dev/null || true
+fi
+EOF
+  chmod 0755 "$ROOTFS_DIR/usr/local/sbin/show-net-addrs"
+
+  cat >"$ROOTFS_DIR/etc/init.d/show-net-addrs" <<'EOF'
+#!/sbin/openrc-run
+
+name="show-net-addrs"
+description="Show network addresses on console and login banner"
+
+depend() {
+  need networking
+  after sshd
+}
+
+start() {
+  ebegin "Updating login banner with network addresses"
+  /usr/local/sbin/show-net-addrs >/dev/null 2>&1 || true
+  eend 0
+}
+EOF
+  chmod 0755 "$ROOTFS_DIR/etc/init.d/show-net-addrs"
+  enable_service show-net-addrs default
 fi
 
 # busybox-suid installs bbsuid as execute-only in usermode; make it readable for tar packaging.

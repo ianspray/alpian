@@ -55,8 +55,10 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - Serial-only login on `ttyFIQ0` at `1500000` baud
   - `openrc` enabled for boot + networking + sshd
   - DHCP enabled on all E54C DSA front-panel ports: `wan`, `lan1`, `lan2`, `lan3`
+  - Boot-time console/login banner prints currently assigned global IP addresses
   - `lbu` configured with `LBU_MEDIA=config`
   - `/etc/apk/cache` points to `/media/config/cache` for persistent package cache
+  - Temporary root password enabled for serial bring-up: `alpine`
 
 ## Customization
 
@@ -66,3 +68,7 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `ALPINE_PACKAGES="alpine-base alpine-conf openssh curl" scripts/prepare-alpine-rootfs.sh`
 - Inject root SSH authorized keys during image build:
   - `ROOT_AUTHORIZED_KEYS_FILE=/path/to/authorized_keys scripts/prepare-alpine-rootfs.sh`
+- Disable temporary root password in future builds:
+  - `ROOT_PASSWORD_HASH= ROOT_PASSWORD_PLAIN= scripts/prepare-alpine-rootfs.sh`
+- Set custom root password at build time:
+  - `ROOT_PASSWORD_PLAIN='your-password' scripts/prepare-alpine-rootfs.sh`
