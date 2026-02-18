@@ -4,7 +4,7 @@ This repository now contains a reproducible pipeline to:
 
 1. Fetch the Radxa kernel tree with E54C DTS support.
 2. Build a custom kernel, modules, and E54C DTBs.
-3. Prepare an Alpine aarch64 minirootfs.
+3. Prepare an Alpine aarch64 rootfs with `apk`, `openrc`, `alpine-conf` (`lbu`), and `openssh`.
 4. Assemble an NVMe-bootable raw disk image using Radxa bootloader offsets.
 
 ## Commands
@@ -51,3 +51,17 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `p1` `config` FAT32 at `16 MiB` offset, size `16 MiB`
   - `p2` `efi` FAT32, size `300 MiB`
   - `p3` `rootfs` ext4 uses remainder
+- Alpine rootfs defaults:
+  - Serial-only login on `ttyFIQ0` at `1500000` baud
+  - `openrc` enabled for boot + networking + sshd
+  - `lbu` configured with `LBU_MEDIA=config`
+  - `/etc/apk/cache` points to `/media/config/cache` for persistent package cache
+
+## Customization
+
+- Override serial device/baud:
+  - `SERIAL_TTY=ttyS2 SERIAL_BAUD=1500000 scripts/prepare-alpine-rootfs.sh`
+- Override default package set:
+  - `ALPINE_PACKAGES="alpine-base alpine-conf openssh curl" scripts/prepare-alpine-rootfs.sh`
+- Inject root SSH authorized keys during image build:
+  - `ROOT_AUTHORIZED_KEYS_FILE=/path/to/authorized_keys scripts/prepare-alpine-rootfs.sh`

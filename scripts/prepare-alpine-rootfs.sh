@@ -10,12 +10,34 @@ ALPINE_BRANCH="${ALPINE_BRANCH:-v3.23}"
 ALPINE_VERSION="${ALPINE_VERSION:-3.23.3}"
 ALPINE_ARCH="${ALPINE_ARCH:-aarch64}"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
+HOST_ARCH="${HOST_ARCH:-$(uname -m)}"
+APK_CACHE_DIR="${APK_CACHE_DIR:-$REPO_ROOT/build/apk-cache}"
+ALPINE_PACKAGES="${ALPINE_PACKAGES:-alpine-base alpine-conf openssh}"
+SERIAL_TTY="${SERIAL_TTY:-ttyFIQ0}"
+SERIAL_BAUD="${SERIAL_BAUD:-1500000}"
+ROOT_AUTHORIZED_KEYS_FILE="${ROOT_AUTHORIZED_KEYS_FILE:-}"
 
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
 ROOTFS_TAR="${ROOTFS_TAR:-$REPO_ROOT/build/alpine-rootfs.tar}"
 
-mkdir -p "$DOWNLOAD_DIR" "$ROOTFS_DIR"
+mkdir -p "$DOWNLOAD_DIR" "$ROOTFS_DIR" "$APK_CACHE_DIR"
+
+require_cmd() {
+  local cmd="$1"
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "Missing required command: $cmd" >&2
+    exit 1
+  fi
+}
+
+require_cmd curl
+require_cmd tar
+require_cmd awk
+require_cmd sed
+
+tmp_work="$(mktemp -d)"
+trap 'rm -rf "$tmp_work"' EXIT
 
 MINIROOTFS="alpine-minirootfs-${ALPINE_VERSION}-${ALPINE_ARCH}.tar.gz"
 MINIROOTFS_URL="${ALPINE_MIRROR}/${ALPINE_BRANCH}/releases/${ALPINE_ARCH}/${MINIROOTFS}"
@@ -35,11 +57,52 @@ ${ALPINE_MIRROR}/${ALPINE_BRANCH}/main
 ${ALPINE_MIRROR}/${ALPINE_BRANCH}/community
 EOF
 
+# Install additional Alpine packages from the host using apk.static.
+HOST_APKINDEX="${DOWNLOAD_DIR}/APKINDEX-${ALPINE_BRANCH}-${HOST_ARCH}.tar.gz"
+if [ ! -f "$HOST_APKINDEX" ]; then
+  curl -fL "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main/${HOST_ARCH}/APKINDEX.tar.gz" -o "$HOST_APKINDEX"
+fi
+tar -xzf "$HOST_APKINDEX" -C "$tmp_work"
+APK_TOOLS_STATIC_VERSION="$(awk 'BEGIN{RS="\n\n"} /P:apk-tools-static\n/ {for (i=1; i<=NF; i++) if ($i ~ /^V:/) {print substr($i,3); exit}}' "$tmp_work/APKINDEX")"
+if [ -z "$APK_TOOLS_STATIC_VERSION" ]; then
+  echo "Unable to determine apk-tools-static version from $HOST_APKINDEX" >&2
+  exit 1
+fi
+
+APK_TOOLS_STATIC_PKG="apk-tools-static-${APK_TOOLS_STATIC_VERSION}.apk"
+APK_TOOLS_STATIC_PATH="${DOWNLOAD_DIR}/${APK_TOOLS_STATIC_PKG}"
+if [ ! -f "$APK_TOOLS_STATIC_PATH" ]; then
+  curl -fL "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main/${HOST_ARCH}/${APK_TOOLS_STATIC_PKG}" -o "$APK_TOOLS_STATIC_PATH"
+fi
+tar -xzf "$APK_TOOLS_STATIC_PATH" -C "$tmp_work"
+APK_STATIC="$tmp_work/sbin/apk.static"
+chmod +x "$APK_STATIC"
+
+"$APK_STATIC" \
+  --usermode \
+  --arch "$ALPINE_ARCH" \
+  --root "$ROOTFS_DIR" \
+  --repositories-file "$ROOTFS_DIR/etc/apk/repositories" \
+  --cache-dir "$APK_CACHE_DIR" \
+  --no-scripts \
+  add $ALPINE_PACKAGES
+
 cat >"$ROOTFS_DIR/etc/fstab" <<'EOF'
-LABEL=config /config vfat defaults 0 2
+LABEL=config /media/config vfat defaults 0 2
 LABEL=efi /boot/efi vfat defaults 0 2
 LABEL=rootfs / ext4 defaults 0 1
 EOF
+
+mkdir -p "$ROOTFS_DIR/media/config" "$ROOTFS_DIR/etc/apk"
+ln -snf /media/config/cache "$ROOTFS_DIR/etc/apk/cache"
+
+if [ -f "$ROOTFS_DIR/etc/lbu/lbu.conf" ]; then
+  if grep -Eq '^[# ]*LBU_MEDIA=' "$ROOTFS_DIR/etc/lbu/lbu.conf"; then
+    sed -E -i 's|^[# ]*LBU_MEDIA=.*|LBU_MEDIA=config|' "$ROOTFS_DIR/etc/lbu/lbu.conf"
+  else
+    echo "LBU_MEDIA=config" >>"$ROOTFS_DIR/etc/lbu/lbu.conf"
+  fi
+fi
 
 mkdir -p "$ROOTFS_DIR/etc/network"
 cat >"$ROOTFS_DIR/etc/network/interfaces" <<'EOF'
@@ -50,9 +113,64 @@ auto eth0
 iface eth0 inet dhcp
 EOF
 
-tar -C "$ROOTFS_DIR" -cf "$ROOTFS_TAR" .
+# Serial-only login for headless operation.
+cat >"$ROOTFS_DIR/etc/inittab" <<EOF
+# /etc/inittab
+
+::sysinit:/sbin/openrc sysinit
+::sysinit:/sbin/openrc boot
+::wait:/sbin/openrc default
+
+${SERIAL_TTY}::respawn:/sbin/getty -L ${SERIAL_BAUD} ${SERIAL_TTY} vt100
+
+::ctrlaltdel:/sbin/reboot
+::shutdown:/sbin/openrc shutdown
+EOF
+
+if ! grep -qx "$SERIAL_TTY" "$ROOTFS_DIR/etc/securetty"; then
+  echo "$SERIAL_TTY" >>"$ROOTFS_DIR/etc/securetty"
+fi
+
+enable_service() {
+  local service="$1"
+  local level="$2"
+  if [ ! -e "$ROOTFS_DIR/etc/init.d/$service" ]; then
+    return 0
+  fi
+  mkdir -p "$ROOTFS_DIR/etc/runlevels/$level"
+  ln -snf "/etc/init.d/$service" "$ROOTFS_DIR/etc/runlevels/$level/$service"
+}
+
+for svc in devfs dmesg mdev procfs sysfs; do
+  enable_service "$svc" sysinit
+done
+for svc in modules sysctl hostname bootmisc swclock localmount; do
+  enable_service "$svc" boot
+done
+for svc in networking sshd; do
+  enable_service "$svc" default
+done
+
+# Optional: preload root authorized_keys for headless SSH access.
+if [ -n "$ROOT_AUTHORIZED_KEYS_FILE" ]; then
+  if [ ! -f "$ROOT_AUTHORIZED_KEYS_FILE" ]; then
+    echo "ROOT_AUTHORIZED_KEYS_FILE does not exist: $ROOT_AUTHORIZED_KEYS_FILE" >&2
+    exit 1
+  fi
+  mkdir -p "$ROOTFS_DIR/root/.ssh"
+  chmod 700 "$ROOTFS_DIR/root/.ssh"
+  cp "$ROOT_AUTHORIZED_KEYS_FILE" "$ROOTFS_DIR/root/.ssh/authorized_keys"
+  chmod 600 "$ROOTFS_DIR/root/.ssh/authorized_keys"
+fi
+
+# busybox-suid installs bbsuid as execute-only in usermode; make it readable for tar packaging.
+if [ -f "$ROOTFS_DIR/bin/bbsuid" ]; then
+  chmod 4755 "$ROOTFS_DIR/bin/bbsuid"
+fi
+
+# Normalize ownership in archive for target root filesystem extraction.
+tar --numeric-owner --owner=0 --group=0 -C "$ROOTFS_DIR" -cf "$ROOTFS_TAR" .
 
 echo "Alpine rootfs prepared:"
 echo "  Rootfs dir: $ROOTFS_DIR"
 echo "  Rootfs tar: $ROOTFS_TAR"
-

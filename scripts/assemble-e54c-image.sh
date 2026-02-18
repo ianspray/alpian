@@ -58,7 +58,7 @@ cp "$KERNEL_DTB" "$tmp_stage/boot/dtbs/rockchip/"
 
 # Keep bootargs intentionally short and put root first.
 # Some U-Boot extlinux paths appear to truncate long APPEND lines.
-CMDLINE_DEFAULT="root=PARTLABEL=rootfs rootfstype=ext4 rootwait rw console=ttyFIQ0,1500000n8 earlycon console=tty1"
+CMDLINE_DEFAULT="root=PARTLABEL=rootfs rootfstype=ext4 rootwait rw console=ttyFIQ0,1500000n8 earlycon"
 CMDLINE="${KERNEL_CMDLINE:-$CMDLINE_DEFAULT}"
 cat >"$tmp_stage/boot/extlinux/extlinux.conf" <<EOF
 DEFAULT custom
@@ -109,6 +109,7 @@ tar-in $ROOTFS_TAR /
 tar-in $BOOT_TAR /
 tar-in $MODULES_TAR /
 upload $CONFIG_FILE /config/config.txt
+mkdir-p /config/cache
 mkdir-p /boot/efi/extlinux
 mkdir-p /boot/efi/boot/dtbs/rockchip
 upload $tmp_stage/boot/extlinux/extlinux.conf /boot/efi/extlinux/extlinux.conf
