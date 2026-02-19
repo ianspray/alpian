@@ -1,4 +1,5 @@
 diff --git a/arch/arm/dts/rk3588s-radxa-e54c.dts b/arch/arm/dts/rk3588s-radxa-e54c.dts
+index 549f8cd56fb..73362b95b08 100644
 --- a/arch/arm/dts/rk3588s-radxa-e54c.dts
 +++ b/arch/arm/dts/rk3588s-radxa-e54c.dts
 @@ -8,11 +8,41 @@
@@ -43,7 +44,7 @@ diff --git a/arch/arm/dts/rk3588s-radxa-e54c.dts b/arch/arm/dts/rk3588s-radxa-e5
  };
  
  /* M.2 M-KEY PCIe */
-@@ -24,3 +54,104 @@
+@@ -24,3 +54,114 @@
  	status = "okay";
  	reset-gpios = <&gpio3 RK_PD1 GPIO_ACTIVE_HIGH>;
  };
@@ -67,6 +68,16 @@ diff --git a/arch/arm/dts/rk3588s-radxa-e54c.dts b/arch/arm/dts/rk3588s-radxa-e5
 +&u2phy3_host {
 +	u-boot,dm-pre-reloc;
 +	phy-supply = <&vcc5v0_usb3_host>;
++	status = "okay";
++};
++
++&usb2phy2_grf {
++	u-boot,dm-pre-reloc;
++	status = "okay";
++};
++
++&usb2phy3_grf {
++	u-boot,dm-pre-reloc;
 +	status = "okay";
 +};
 +
