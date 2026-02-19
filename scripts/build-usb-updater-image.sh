@@ -89,7 +89,34 @@ if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null
   exit 1
 fi
 
-root_dev="$(awk '$2=="/"{print $1; exit}' /proc/mounts 2>/dev/null || true)"
+resolve_root_device() {
+  local src=""
+
+  if command -v findmnt >/dev/null 2>&1; then
+    src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+  fi
+
+  if [ -z "$src" ]; then
+    src="$(awk '$2=="/"{print $1; exit}' /proc/mounts 2>/dev/null || true)"
+  fi
+
+  # Some kernels expose / as /dev/root; resolve from partlabel in that case.
+  if [ "$src" = "/dev/root" ] || [ "$src" = "rootfs" ] || [ "$src" = "overlay" ] || [ -z "$src" ]; then
+    if [ -b "/dev/disk/by-partlabel/$ROOT_PARTLABEL_REQUIRED" ]; then
+      src="$(readlink -f "/dev/disk/by-partlabel/$ROOT_PARTLABEL_REQUIRED")"
+    elif command -v blkid >/dev/null 2>&1; then
+      src="$(blkid -t "PARTLABEL=$ROOT_PARTLABEL_REQUIRED" -o device 2>/dev/null | head -n1 || true)"
+    fi
+  fi
+
+  if [ -n "$src" ] && [ -e "$src" ]; then
+    src="$(readlink -f "$src" 2>/dev/null || printf '%s' "$src")"
+  fi
+
+  printf '%s' "$src"
+}
+
+root_dev="$(resolve_root_device)"
 if [ -z "$root_dev" ] || [ ! -b "$root_dev" ]; then
   log "Unable to determine root block device."
   exit 1
