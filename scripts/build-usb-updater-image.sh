@@ -67,10 +67,10 @@ set -eu
 PAYLOAD_FILE="/opt/e54c-updater/nvme-image.img.zst"
 PAYLOAD_SHA256="/opt/e54c-updater/nvme-image.img.zst.sha256"
 TARGET_NVME_DEVICE="${TARGET_NVME_DEVICE:-/dev/nvme0n1}"
-EFI_MOUNT="/boot/efi"
-EXTLINUX_CONF="$EFI_MOUNT/extlinux/extlinux.conf"
-DISABLED_EXTLINUX_CONF="$EFI_MOUNT/extlinux/extlinux.conf.disabled"
-DONE_MARKER="$EFI_MOUNT/UPDATE_DONE"
+ROOT_PARTLABEL_REQUIRED="${ROOT_PARTLABEL_REQUIRED:-updater-rootfs}"
+TARGET_WAIT_SECONDS="${TARGET_WAIT_SECONDS:-120}"
+UPDATER_EFI_MOUNT="/run/e54c-updater-efi"
+RUN_MARKER="/run/e54c-usb-update.attempted"
 
 log() {
   echo "[e54c-usb-updater] $*"
@@ -78,9 +78,44 @@ log() {
 
 log "E54C USB updater image active."
 
-if [ -f "$DONE_MARKER" ]; then
-  log "Update already completed on this USB media; skipping."
+if [ -f "$RUN_MARKER" ]; then
+  log "Updater already attempted this boot; skipping."
   exit 0
+fi
+touch "$RUN_MARKER"
+
+if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null; then
+  log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED)."
+  exit 1
+fi
+
+root_dev="$(awk '$2=="/"{print $1; exit}' /proc/mounts 2>/dev/null || true)"
+if [ -z "$root_dev" ] || [ ! -b "$root_dev" ]; then
+  log "Unable to determine root block device."
+  exit 1
+fi
+
+case "$root_dev" in
+  /dev/sd[a-z]3|/dev/vd[a-z]3|/dev/xvd[a-z]3)
+    efi_dev="${root_dev%3}2"
+    ;;
+  /dev/mmcblk*p3|/dev/nvme*n*p3)
+    efi_dev="${root_dev%p3}p2"
+    ;;
+  *)
+    log "Unsupported root device layout: $root_dev"
+    exit 1
+    ;;
+esac
+
+if [ ! -b "$efi_dev" ]; then
+  log "Updater EFI partition not found: $efi_dev"
+  exit 1
+fi
+
+if [ "$root_dev" = "${TARGET_NVME_DEVICE}p3" ] || [ "$root_dev" = "${TARGET_NVME_DEVICE}p2" ] || [ "$root_dev" = "${TARGET_NVME_DEVICE}p1" ]; then
+  log "Rootfs is on target device $TARGET_NVME_DEVICE; refusing to self-overwrite."
+  exit 1
 fi
 
 if [ ! -f "$PAYLOAD_FILE" ] || [ ! -f "$PAYLOAD_SHA256" ]; then
@@ -88,9 +123,29 @@ if [ ! -f "$PAYLOAD_FILE" ] || [ ! -f "$PAYLOAD_SHA256" ]; then
   exit 1
 fi
 
+i=0
+while [ ! -b "$TARGET_NVME_DEVICE" ] && [ "$i" -lt "$TARGET_WAIT_SECONDS" ]; do
+  i=$((i + 1))
+  sleep 1
+done
 if [ ! -b "$TARGET_NVME_DEVICE" ]; then
-  log "Target NVMe device not found: $TARGET_NVME_DEVICE"
+  log "Target NVMe device not found after ${TARGET_WAIT_SECONDS}s: $TARGET_NVME_DEVICE"
   exit 1
+fi
+
+log "Root device: $root_dev"
+log "Updater EFI partition: $efi_dev"
+log "Target NVMe device: $TARGET_NVME_DEVICE"
+
+EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
+DISABLED_EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf.disabled"
+DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
+mkdir -p "$UPDATER_EFI_MOUNT"
+mountpoint -q "$UPDATER_EFI_MOUNT" || mount "$efi_dev" "$UPDATER_EFI_MOUNT"
+if [ -f "$DONE_MARKER" ]; then
+  log "Update already completed on this USB media; skipping."
+  umount "$UPDATER_EFI_MOUNT" || true
+  exit 0
 fi
 
 log "Verifying payload checksum..."
@@ -109,14 +164,12 @@ if command -v udevadm >/dev/null 2>&1; then
 fi
 
 log "Disabling USB updater boot entry so next boot falls through to NVMe..."
-mountpoint -q "$EFI_MOUNT" || mount "$EFI_MOUNT"
-mount -o remount,rw "$EFI_MOUNT"
 if [ -f "$EXTLINUX_CONF" ]; then
   mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF"
 fi
 date -u +"updated:%Y-%m-%dT%H:%M:%SZ target:$TARGET_NVME_DEVICE" >"$DONE_MARKER"
 sync
-mount -o remount,ro "$EFI_MOUNT" || true
+umount "$UPDATER_EFI_MOUNT" || true
 
 log "Update complete. Rebooting into NVMe image."
 sleep 2
