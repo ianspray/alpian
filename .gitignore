@@ -7,4 +7,7 @@ src/radxa-kernel-e54c/
 *.iso
 *.tar.gz
 *.tar.xz
-assets/reference/u-boot/
+assets/reference/u-boot/*
+!assets/reference/u-boot/patches/
+assets/reference/u-boot/patches/*
+!assets/reference/u-boot/patches/*.patch

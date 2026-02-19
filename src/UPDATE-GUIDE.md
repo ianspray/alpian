@@ -97,6 +97,22 @@ Sustainability notes:
 2. Keep E54C-critical networking options pinned (DSA + Realtek switch stack).
 3. Never ship a new kernel without its matching modules directory in the same image.
 
+## 2b) Updating SPI U-Boot (USB Fix / Boot Policy)
+
+If USB boot probing in U-Boot is broken (`usb start` shows no working controllers), update SPI U-Boot with the E54C USB DTS patch flow:
+
+```bash
+scripts/build-uboot-e54c-spi.sh
+```
+
+Outputs are placed under `build/u-boot-artifacts/` and include:
+
+1. `u-boot.itb` (patched U-Boot proper)
+2. `idbloader.vendor.img` (copied fallback from current repo reference, when present)
+3. `build-info.txt` with source commit and DTS evidence
+
+Then flash SPI with your normal Rockchip offsets (idbloader at LBA 64, `u-boot.itb` at LBA 16384), and set boot order to `usb0 nvme0` if desired.
+
 ## 3) Maintenance Boot Workflow
 
 Use maintenance mode when you intentionally want writes to base storage.

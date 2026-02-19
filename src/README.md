@@ -30,6 +30,12 @@ Build USB updater image (boots from USB, flashes NVMe payload, then reboots):
 scripts/build-usb-updater-image.sh
 ```
 
+Build patched SPI U-Boot for E54C USB host bring-up:
+
+```bash
+scripts/build-uboot-e54c-spi.sh
+```
+
 Write USB updater image to a USB stick:
 
 ```bash
@@ -152,3 +158,4 @@ If `saveenv` is unavailable/persistent storage is not configured, SPI U-Boot mus
 ## Operations Guide
 
 - See `src/UPDATE-GUIDE.md` for sustainable version update workflows and OTA strategy guidance.
+- See `src/UBOOT-USB-FINDINGS.md` for source-backed U-Boot USB findings and rationale for DTS patching.
