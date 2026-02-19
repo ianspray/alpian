@@ -75,3 +75,7 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `ROOT_PASSWORD_PLAIN='your-password' scripts/prepare-alpine-rootfs.sh`
 - Disable force-loading E54C DSA modules:
   - `E54C_FORCE_DSA_MODULES=0 scripts/prepare-alpine-rootfs.sh`
+
+## Operations Guide
+
+- See `src/UPDATE-GUIDE.md` for sustainable version update workflows and OTA strategy guidance.
