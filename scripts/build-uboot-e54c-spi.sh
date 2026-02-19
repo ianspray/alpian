@@ -20,8 +20,8 @@ SPI_IMAGE_SIZE_BYTES="${SPI_IMAGE_SIZE_BYTES:-16777216}"
 SPI_IMAGE_STRATEGY="${SPI_IMAGE_STRATEGY:-base-image}"
 SPI_UBOOT_SOURCE="${SPI_UBOOT_SOURCE:-base}"
 SPI_FDT_SOURCE="${SPI_FDT_SOURCE:-base}"
-SPI_BASE_IMAGE_URL="${SPI_BASE_IMAGE_URL:-https://dl.radxa.com/e/e54c/images/radxa-e54c-spi-flash-image.img}"
-SPI_BASE_IMAGE_PATH="${SPI_BASE_IMAGE_PATH:-$REPO_ROOT/build/downloads/radxa-e54c-spi-flash-image.img}"
+SPI_BASE_IMAGE_URL="${SPI_BASE_IMAGE_URL:-https://dl.radxa.com/e/e54c/images/radxa-e54c-spi-flash-image-20250620.img}"
+SPI_BASE_IMAGE_PATH="${SPI_BASE_IMAGE_PATH:-$REPO_ROOT/build/downloads/radxa-e54c-spi-flash-image-20250620.img}"
 
 require_cmd() {
   local cmd="$1"
