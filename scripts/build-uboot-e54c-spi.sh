@@ -41,6 +41,30 @@ if [ ! -f "$PATCH_FILE" ]; then
   exit 1
 fi
 
+fit_has_atf() {
+  local fit_path="$1"
+  local dumpimage_bin="$2"
+  "$dumpimage_bin" -l "$fit_path" 2>/dev/null | grep -q "(atf-1)"
+}
+
+fit_find_image_index() {
+  local fit_path="$1"
+  local dumpimage_bin="$2"
+  local image_name="$3"
+  "$dumpimage_bin" -l "$fit_path" 2>/dev/null | sed -n "s/^ Image \\([0-9]\\+\\) (${image_name}).*/\\1/p" | head -n1
+}
+
+fit_find_load_addr() {
+  local fit_path="$1"
+  local dumpimage_bin="$2"
+  local image_name="$3"
+  "$dumpimage_bin" -l "$fit_path" 2>/dev/null | awk -v name="$image_name" '
+    $0 ~ "\\("name"\\)" {in_image=1; next}
+    in_image && /Load Address:/ {print $3; exit}
+    in_image && /^ Image [0-9]+ \(/ {in_image=0}
+  '
+}
+
 mkdir -p "$(dirname "$UBOOT_WORKDIR")" "$OUT_ROOT"
 
 if [ ! -d "$UBOOT_WORKDIR/.git" ]; then
@@ -71,6 +95,127 @@ make -C "$UBOOT_WORKDIR" -j"$JOBS" CROSS_COMPILE="$CROSS_COMPILE" u-boot.itb
 if [ ! -f "$UBOOT_WORKDIR/u-boot.itb" ]; then
   echo "Build did not produce u-boot.itb" >&2
   exit 1
+fi
+
+DUMPIMAGE_BIN="$UBOOT_WORKDIR/tools/dumpimage"
+MKIMAGE_BIN="$UBOOT_WORKDIR/tools/mkimage"
+if [ ! -x "$DUMPIMAGE_BIN" ] || [ ! -x "$MKIMAGE_BIN" ]; then
+  echo "Expected U-Boot tools were not built: $DUMPIMAGE_BIN / $MKIMAGE_BIN" >&2
+  exit 1
+fi
+
+ATF_REPACKED="0"
+if ! fit_has_atf "$UBOOT_WORKDIR/u-boot.itb" "$DUMPIMAGE_BIN"; then
+  if [ "$SPI_IMAGE_STRATEGY" != "base-image" ]; then
+    echo "Built u-boot.itb is missing ATF images and SPI_IMAGE_STRATEGY is not base-image." >&2
+    echo "Set SPI_IMAGE_STRATEGY=base-image to repack from Radxa base ATF payloads." >&2
+    exit 1
+  fi
+
+  mkdir -p "$(dirname "$SPI_BASE_IMAGE_PATH")"
+  if [ ! -f "$SPI_BASE_IMAGE_PATH" ]; then
+    echo "Downloading base SPI image: $SPI_BASE_IMAGE_URL"
+    curl -fL "$SPI_BASE_IMAGE_URL" -o "$SPI_BASE_IMAGE_PATH"
+  fi
+
+  repack_dir="$(mktemp -d)"
+  trap 'rm -rf "$repack_dir"' EXIT
+  BASE_UBOOT_ITB="$repack_dir/base-u-boot.itb"
+  dd if="$SPI_BASE_IMAGE_PATH" of="$BASE_UBOOT_ITB" bs=512 skip="$SPI_UBOOT_ITB_LBA" count=8192 status=none
+
+  idx_atf1="$(fit_find_image_index "$BASE_UBOOT_ITB" "$DUMPIMAGE_BIN" "atf-1")"
+  idx_atf2="$(fit_find_image_index "$BASE_UBOOT_ITB" "$DUMPIMAGE_BIN" "atf-2")"
+  idx_atf3="$(fit_find_image_index "$BASE_UBOOT_ITB" "$DUMPIMAGE_BIN" "atf-3")"
+  if [ -z "$idx_atf1" ] || [ -z "$idx_atf2" ] || [ -z "$idx_atf3" ]; then
+    echo "Failed to find ATF entries in base SPI image FIT." >&2
+    exit 1
+  fi
+
+  load_atf1="$(fit_find_load_addr "$BASE_UBOOT_ITB" "$DUMPIMAGE_BIN" "atf-1")"
+  load_atf2="$(fit_find_load_addr "$BASE_UBOOT_ITB" "$DUMPIMAGE_BIN" "atf-2")"
+  load_atf3="$(fit_find_load_addr "$BASE_UBOOT_ITB" "$DUMPIMAGE_BIN" "atf-3")"
+  load_atf1="${load_atf1:-0x00040000}"
+  load_atf2="${load_atf2:-0xff100000}"
+  load_atf3="${load_atf3:-0x000f0000}"
+
+  "$DUMPIMAGE_BIN" -i "$BASE_UBOOT_ITB" -T flat_dt -p "$idx_atf1" -o "$repack_dir/atf-1.bin" "$repack_dir/_extract.bin" >/dev/null
+  "$DUMPIMAGE_BIN" -i "$BASE_UBOOT_ITB" -T flat_dt -p "$idx_atf2" -o "$repack_dir/atf-2.bin" "$repack_dir/_extract.bin" >/dev/null
+  "$DUMPIMAGE_BIN" -i "$BASE_UBOOT_ITB" -T flat_dt -p "$idx_atf3" -o "$repack_dir/atf-3.bin" "$repack_dir/_extract.bin" >/dev/null
+
+  cat >"$repack_dir/u-boot-repack.its" <<EOF
+/dts-v1/;
+/ {
+	description = "FIT Image with ATF/OP-TEE/U-Boot/MCU";
+	#address-cells = <1>;
+	images {
+		uboot {
+			description = "U-Boot";
+			data = /incbin/("u-boot.bin");
+			type = "standalone";
+			arch = "arm64";
+			compression = "none";
+			load = <0x00200000>;
+			hash { algo = "sha256"; };
+		};
+		atf-1 {
+			description = "ARM Trusted Firmware";
+			data = /incbin/("atf-1.bin");
+			type = "firmware";
+			arch = "arm64";
+			compression = "none";
+			load = <${load_atf1}>;
+			hash { algo = "sha256"; };
+		};
+		atf-2 {
+			description = "ARM Trusted Firmware";
+			data = /incbin/("atf-2.bin");
+			type = "firmware";
+			arch = "arm64";
+			compression = "none";
+			load = <${load_atf2}>;
+			hash { algo = "sha256"; };
+		};
+		atf-3 {
+			description = "ARM Trusted Firmware";
+			data = /incbin/("atf-3.bin");
+			type = "firmware";
+			arch = "arm64";
+			compression = "none";
+			load = <${load_atf3}>;
+			hash { algo = "sha256"; };
+		};
+		fdt {
+			description = "U-Boot dtb";
+			data = /incbin/("u-boot.dtb");
+			type = "flat_dt";
+			arch = "arm64";
+			compression = "none";
+			hash { algo = "sha256"; };
+		};
+	};
+	configurations {
+		default = "conf";
+		conf {
+			description = "rk3588s-radxa-e54c-spi";
+			firmware = "atf-1";
+			loadables = "uboot", "atf-2", "atf-3";
+			fdt = "fdt";
+		};
+	};
+};
+EOF
+
+  cp "$UBOOT_WORKDIR/u-boot.bin" "$repack_dir/u-boot.bin"
+  cp "$UBOOT_WORKDIR/u-boot.dtb" "$repack_dir/u-boot.dtb"
+  (
+    cd "$repack_dir"
+    "$MKIMAGE_BIN" -f u-boot-repack.its "$UBOOT_WORKDIR/u-boot.itb" >/dev/null
+  )
+  if ! fit_has_atf "$UBOOT_WORKDIR/u-boot.itb" "$DUMPIMAGE_BIN"; then
+    echo "Repacked u-boot.itb still missing ATF images." >&2
+    exit 1
+  fi
+  ATF_REPACKED="1"
 fi
 
 UBOOT_VER="$(make -C "$UBOOT_WORKDIR" -s ubootversion || true)"
@@ -185,6 +330,7 @@ dtc -I dtb -O dts -o "$DTS_CHECK" "$ARTIFACT_DIR/u-boot.dtb" >/dev/null 2>&1 || 
   echo "patch_file=$PATCH_FILE"
   echo "patch_state=$PATCH_STATE"
   echo "cross_compile=$CROSS_COMPILE"
+  echo "fit_atf_repacked=$ATF_REPACKED"
   echo "spi_image_strategy=$SPI_IMAGE_STRATEGY"
   echo "spi_image_source=$SPI_IMAGE_SOURCE"
   echo "spi_image_source_sha256=$SPI_IMAGE_SOURCE_SHA256"
