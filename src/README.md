@@ -55,6 +55,7 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - Serial-only login on `ttyFIQ0` at `1500000` baud
   - `openrc` enabled for boot + networking + sshd
   - DHCP enabled on all E54C DSA front-panel ports: `wan`, `lan1`, `lan2`, `lan3`
+  - E54C DSA/Realtek modules are force-loaded via `/etc/modules` at boot
   - Boot-time console/login banner prints currently assigned global IP addresses
   - `lbu` configured with `LBU_MEDIA=config`
   - `/etc/apk/cache` points to `/media/config/cache` for persistent package cache
@@ -72,3 +73,5 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `ROOT_PASSWORD_HASH= ROOT_PASSWORD_PLAIN= scripts/prepare-alpine-rootfs.sh`
 - Set custom root password at build time:
   - `ROOT_PASSWORD_PLAIN='your-password' scripts/prepare-alpine-rootfs.sh`
+- Disable force-loading E54C DSA modules:
+  - `E54C_FORCE_DSA_MODULES=0 scripts/prepare-alpine-rootfs.sh`

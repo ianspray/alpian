@@ -20,6 +20,7 @@ ROOT_PASSWORD_HASH="${ROOT_PASSWORD_HASH:-\$6\$e54c\$AvSUgOTK89YCT1RHhqB/SfsK3J5
 ROOT_PASSWORD_PLAIN="${ROOT_PASSWORD_PLAIN:-}"
 ROOT_PASSWORD_SALT="${ROOT_PASSWORD_SALT:-e54c}"
 ENABLE_BOOT_NET_BANNER="${ENABLE_BOOT_NET_BANNER:-1}"
+E54C_FORCE_DSA_MODULES="${E54C_FORCE_DSA_MODULES:-1}"
 
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
@@ -128,6 +129,23 @@ iface lan2 inet dhcp
 auto lan3
 iface lan3 inet dhcp
 EOF
+
+if [ "$E54C_FORCE_DSA_MODULES" = "1" ]; then
+  cat >"$ROOTFS_DIR/etc/modules" <<'EOF'
+# Base networking modules
+af_packet
+ipv6
+
+# Radxa E54C DSA switch stack (front-panel ports wan/lan1/lan2/lan3)
+dsa_core
+tag_rtl4_a
+tag_rtl8_4
+realtek-mdio
+realtek-smi
+rtl8365mb
+rtl8366
+EOF
+fi
 
 # Serial-only login for headless operation.
 cat >"$ROOTFS_DIR/etc/inittab" <<EOF
