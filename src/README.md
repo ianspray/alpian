@@ -24,6 +24,18 @@ One-shot pipeline:
 scripts/build-all-e54c.sh
 ```
 
+Build USB updater image (boots from USB, flashes NVMe payload, then reboots):
+
+```bash
+scripts/build-usb-updater-image.sh
+```
+
+Write USB updater image to a USB stick:
+
+```bash
+sudo scripts/write-image-to-nvme.sh --image build/e54c-alpine-usb-updater.img --device /dev/sdX --yes
+```
+
 Flash the generated image to NVMe:
 
 ```bash
@@ -51,6 +63,12 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `p1` `config` FAT32 at `16 MiB` offset, size `256 MiB`
   - `p2` `efi` FAT32, size `300 MiB`
   - `p3` `rootfs` ext4 uses remainder
+- USB updater image details:
+  - Includes compressed payload derived from `build/e54c-alpine-custom.img`
+  - Boots a maintenance-style updater profile from USB
+  - Auto-runs `e54c-usb-nvme-update` service to flash `/dev/nvme0n1`
+  - Disables its own USB `/extlinux/extlinux.conf` after successful flash
+  - Reboots so U-Boot can fall through to NVMe on next boot
 - Alpine rootfs defaults:
   - Serial-only login on `ttyFIQ0` at `1500000` baud
   - `openrc` enabled for boot + networking + sshd
@@ -111,6 +129,25 @@ Notes:
 - Standard `reboot`/`shutdown` do not natively select an extlinux boot label.
 - Use `e54c-boot-mode reboot-maintenance` for a one-shot maintenance boot without serial-console interaction.
 - After that maintenance boot, the next reboot returns to immutable by default.
+
+## USB-First Update Flow
+
+To use USB media as an update carrier, SPI U-Boot must prefer USB before NVMe.
+
+Expected boot target order:
+
+```text
+usb0 nvme0
+```
+
+Typical U-Boot commands (on the E54C U-Boot console):
+
+```text
+setenv boot_targets usb0 nvme0
+saveenv
+```
+
+If `saveenv` is unavailable/persistent storage is not configured, SPI U-Boot must be rebuilt/reflashed with USB-first default boot order.
 
 ## Operations Guide
 

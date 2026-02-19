@@ -226,3 +226,57 @@ Never switch only one of these components.
 2. Add extlinux generation for dual entries and default-slot selection.
 3. Add an updater script that writes inactive slot from a signed bundle in `config`.
 4. Add a boot health marker service and rollback logic using state in `config`.
+
+## 5) USB-Carried Update Workflow (Implemented)
+
+This repository now supports building a USB updater image that carries a full NVMe image payload.
+
+Build command:
+
+```bash
+scripts/build-usb-updater-image.sh
+```
+
+Write updater image to USB media:
+
+```bash
+sudo scripts/write-image-to-nvme.sh --image build/e54c-alpine-usb-updater.img --device /dev/sdX --yes
+```
+
+Default artifacts:
+
+1. Source NVMe image payload: `build/e54c-alpine-custom.img`
+2. USB updater image: `build/e54c-alpine-usb-updater.img`
+
+### Device Boot Prerequisite
+
+SPI U-Boot must try USB before NVMe, for example:
+
+```text
+boot_targets=usb0 nvme0
+```
+
+If persistent environment is not available, this must be set in the SPI U-Boot build defaults.
+
+### Runtime Update Sequence
+
+1. Insert USB updater stick.
+2. Reboot/power-cycle E54C.
+3. U-Boot boots USB updater image.
+4. OpenRC service `e54c-usb-nvme-update` verifies payload checksum and flashes NVMe.
+5. On success, updater renames USB `/extlinux/extlinux.conf` to `.disabled`.
+6. Updater reboots.
+7. U-Boot no longer sees bootable extlinux on USB and falls through to NVMe.
+
+### Why This Avoids Boot Loops
+
+1. USB media self-disables its own extlinux entry only after successful flash.
+2. Leaving the USB stick inserted still results in NVMe boot on the next cycle.
+
+### Key Environment Knobs
+
+1. `NVME_IMAGE_PATH` - payload source image to embed.
+2. `USB_UPDATER_IMAGE_PATH` - output updater image path.
+3. `UPDATER_TARGET_NVME_DEVICE` - target device inside updater runtime (default `/dev/nvme0n1`).
+4. `USB_IMAGE_SIZE` - force updater image size (otherwise auto-calculated from payload size + overhead).
+5. `UPDATER_OVERHEAD_MIB` - extra capacity added to payload when auto-sizing.

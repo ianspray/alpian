@@ -292,7 +292,7 @@ fi
 EOF
   chmod 0755 "$ROOTFS_DIR/usr/local/sbin/show-net-addrs"
 
-  cat >"$ROOTFS_DIR/etc/init.d/show-net-addrs" <<'EOF'
+cat >"$ROOTFS_DIR/etc/init.d/show-net-addrs" <<'EOF'
 #!/sbin/openrc-run
 
 name="show-net-addrs"
@@ -313,6 +313,7 @@ EOF
   enable_service show-net-addrs default
 fi
 
+mkdir -p "$ROOTFS_DIR/usr/local/sbin"
 cat >"$ROOTFS_DIR/usr/local/sbin/e54c-boot-mode" <<'EOF'
 #!/bin/sh
 set -eu
