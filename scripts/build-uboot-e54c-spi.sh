@@ -256,6 +256,11 @@ if [ -n "$FIT_REPACK_REASON" ]; then
 			firmware = "atf-1";
 			loadables = "uboot", "atf-2", "atf-3";
 			fdt = "fdt";
+			signature {
+				algo = "sha256,rsa2048";
+				key-name-hint = "dev";
+				sign-images = "firmware", "loadables", "fdt";
+			};
 		};
 	};
 };
@@ -263,7 +268,7 @@ EOF
 
   (
     cd "$repack_dir"
-    "$MKIMAGE_BIN" -f u-boot-repack.its "$UBOOT_WORKDIR/u-boot.itb" >/dev/null
+    "$MKIMAGE_BIN" -E -f u-boot-repack.its "$UBOOT_WORKDIR/u-boot.itb" >/dev/null
   )
   if ! fit_has_atf "$UBOOT_WORKDIR/u-boot.itb" "$DUMPIMAGE_BIN"; then
     echo "Repacked u-boot.itb still missing ATF images." >&2
