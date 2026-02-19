@@ -16,6 +16,7 @@ IMAGE_SIZE="${IMAGE_SIZE:-8G}"
 ROOTFS_TAR="${ROOTFS_TAR:-$REPO_ROOT/build/alpine-rootfs.tar}"
 UBOOT_DIR="${UBOOT_DIR:-$REPO_ROOT/assets/reference/u-boot}"
 CONFIG_FILE="${CONFIG_FILE:-$REPO_ROOT/assets/reference/radxa/config.txt}"
+DEFAULT_BOOT_MODE="${DEFAULT_BOOT_MODE:-immutable}"
 
 # Partition geometry (512-byte sectors):
 # - p1 config: 256 MiB (starts at 16 MiB)
@@ -70,19 +71,39 @@ cp "$KERNEL_DTB" "$tmp_stage/boot/dtbs/rockchip/"
 
 # Keep bootargs intentionally short and put root first.
 # Some U-Boot extlinux paths appear to truncate long APPEND lines.
-CMDLINE_DEFAULT="root=PARTLABEL=rootfs rootfstype=ext4 rootwait rw console=ttyFIQ0,1500000n8 earlycon"
-CMDLINE="${KERNEL_CMDLINE:-$CMDLINE_DEFAULT}"
+CMDLINE_BASE_DEFAULT="root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon"
+CMDLINE_BASE="${KERNEL_CMDLINE_BASE:-$CMDLINE_BASE_DEFAULT}"
+CMDLINE_IMMUTABLE_DEFAULT="${CMDLINE_BASE} ro overlaytmpfs=yes"
+CMDLINE_MAINTENANCE_DEFAULT="${CMDLINE_BASE} rw"
+CMDLINE_IMMUTABLE="${KERNEL_CMDLINE_IMMUTABLE:-${KERNEL_CMDLINE:-$CMDLINE_IMMUTABLE_DEFAULT}}"
+CMDLINE_MAINTENANCE="${KERNEL_CMDLINE_MAINTENANCE:-$CMDLINE_MAINTENANCE_DEFAULT}"
+
+case "$DEFAULT_BOOT_MODE" in
+  immutable) DEFAULT_EXTLINUX_LABEL="immutable" ;;
+  maintenance) DEFAULT_EXTLINUX_LABEL="maintenance" ;;
+  *)
+    echo "Unsupported DEFAULT_BOOT_MODE: $DEFAULT_BOOT_MODE (expected immutable|maintenance)" >&2
+    exit 1
+    ;;
+esac
+
 cat >"$tmp_stage/boot/extlinux/extlinux.conf" <<EOF
-DEFAULT custom
+DEFAULT ${DEFAULT_EXTLINUX_LABEL}
 MENU TITLE U-Boot menu
 PROMPT 1
 TIMEOUT 50
 
-LABEL custom
-  MENU LABEL Alpine Linux (custom E54C kernel)
+LABEL immutable
+  MENU LABEL Alpine Linux (immutable root, overlaytmpfs)
   LINUX /boot/Image
   FDT /boot/dtbs/rockchip/rk3588s-radxa-e54c.dtb
-  APPEND ${CMDLINE}
+  APPEND ${CMDLINE_IMMUTABLE}
+
+LABEL maintenance
+  MENU LABEL Alpine Linux (maintenance, writable rootfs)
+  LINUX /boot/Image
+  FDT /boot/dtbs/rockchip/rk3588s-radxa-e54c.dtb
+  APPEND ${CMDLINE_MAINTENANCE}
 EOF
 
 BOOT_TAR="$tmp_stage/boot.tar"

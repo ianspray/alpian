@@ -122,6 +122,13 @@ For packages known to be required at runtime:
 
 This keeps runtime `lbu` data small because package payload is in the base image.
 
+Current image runtime model:
+
+1. Default boot uses immutable root (`overlaytmpfs=yes`).
+2. Writes are RAM-backed unless explicitly persisted.
+3. Use maintenance boot profile for persistent package/base-system changes.
+4. Use `lbu commit` for explicit config persistence to `config` media.
+
 For ad-hoc runtime packages:
 
 1. `apk add ...`

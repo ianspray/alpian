@@ -54,11 +54,14 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
 - Alpine rootfs defaults:
   - Serial-only login on `ttyFIQ0` at `1500000` baud
   - `openrc` enabled for boot + networking + sshd
+  - Immutable runtime mode by default: kernel cmdline uses `overlaytmpfs=yes` and read-only lower root
+  - Maintenance boot mode available in extlinux menu with writable rootfs (`rw`, no overlay)
   - E54C network defaults: DHCP client on `wan`; `lan1`/`lan2`/`lan3` set to `manual`
   - E54C DSA/Realtek modules are force-loaded via `/etc/modules` at boot
   - Boot-time console/login banner prints currently assigned global IP addresses
   - `lbu` configured with `LBU_MEDIA=config`
-  - `/etc/apk/cache` points to `/media/config/cache` for persistent package cache
+  - `config` and `efi` partitions are mounted read-only in normal operation
+  - `/etc/apk/cache` points to `/media/config/cache`; remount `config` read-write for maintenance/package operations
   - Temporary root password enabled for serial bring-up: `alpine`
 
 ## Customization
@@ -76,6 +79,11 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `ROOT_PASSWORD_PLAIN='your-password' scripts/prepare-alpine-rootfs.sh`
 - Disable force-loading E54C DSA modules:
   - `E54C_FORCE_DSA_MODULES=0 scripts/prepare-alpine-rootfs.sh`
+- Change default boot mode in generated extlinux config:
+  - `DEFAULT_BOOT_MODE=maintenance scripts/assemble-e54c-image.sh`
+- Override immutable/maintenance cmdlines:
+  - `KERNEL_CMDLINE_IMMUTABLE='root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon ro overlaytmpfs=yes' scripts/assemble-e54c-image.sh`
+  - `KERNEL_CMDLINE_MAINTENANCE='root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon rw' scripts/assemble-e54c-image.sh`
 
 ## Operations Guide
 

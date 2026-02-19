@@ -15,6 +15,13 @@ The current runtime layout is:
 2. `p2` (`efi`) for extlinux + kernel + DTB.
 3. `p3` (`rootfs`) for Alpine root filesystem.
 
+Current runtime mode:
+
+1. Default boot profile is immutable (`overlaytmpfs=yes`): lower rootfs is read-only and runtime writes are in RAM.
+2. `config` and `efi` are mounted read-only by default.
+3. Maintenance boot profile is available from extlinux menu with writable rootfs (`rw`, no overlay).
+4. Persistent config is saved only when explicitly requested via `lbu commit`.
+
 Current default partition sizing:
 
 1. `p1` `config`: 256 MiB
@@ -50,6 +57,14 @@ Sustainability notes:
    - `ROOT_PASSWORD_HASH`
    - `ROOT_PASSWORD_PLAIN`
 
+### Runtime Behavior With Immutable Mode
+
+1. In normal boots, package/config/log writes do not persist to NVMe unless you explicitly commit.
+2. For persistent config updates from normal boot:
+   - edit config under `/etc`
+   - run `lbu commit`
+3. `lbu` writes to `config` media and is the explicit persistence action.
+
 ## 2) Updating Kernel/Modules/DTB to a New Version
 
 Recommended process:
@@ -82,14 +97,41 @@ Sustainability notes:
 2. Keep E54C-critical networking options pinned (DSA + Realtek switch stack).
 3. Never ship a new kernel without its matching modules directory in the same image.
 
-## 3) Update Strategy for Running Systems
+## 3) Maintenance Boot Workflow
+
+Use maintenance mode when you intentionally want writes to base storage.
+
+### Enter Maintenance Mode
+
+1. At U-Boot extlinux menu, select:
+   - `Alpine Linux (maintenance, writable rootfs)`
+2. Or build image with maintenance as default:
+
+```bash
+DEFAULT_BOOT_MODE=maintenance scripts/assemble-e54c-image.sh
+```
+
+### Typical Maintenance Tasks
+
+1. `apk add`/`apk upgrade`
+2. Kernel artifact replacement during development
+3. One-time filesystem edits that must become part of base rootfs
+
+### Return to Immutable Runtime
+
+1. Reboot and select:
+   - `Alpine Linux (immutable root, overlaytmpfs)`
+2. Verify root command line includes `overlaytmpfs=yes`.
+
+## 4) Update Strategy for Running Systems
 
 ### Summary Recommendation
 
-Use **A/B slots** for kernel + DTB + rootfs updates.  
-Do not update the active rootfs in place for normal OTA workflow.
+Current implementation is a **single-slot immutable runtime + maintenance boot mode**.
 
-### Why A/B Is Best Here
+For fleet/OTA hardening, evolve to **A/B slots** for kernel + DTB + rootfs.
+
+### Why A/B Is Still the End-State
 
 1. Kernel, DTB, modules, and userspace must stay version-matched.
 2. In-place updates are power-loss fragile and harder to roll back safely.
@@ -110,7 +152,7 @@ Cons:
 2. Hard rollback when kernel or modules mismatch.
 3. Requires careful service stop ordering.
 
-Verdict: acceptable only for manual maintenance windows, not best long-term OTA design.
+Verdict: acceptable for controlled manual maintenance, not best long-term OTA design.
 
 #### Option B: Boot-time “check and copy over active rootfs” (middle ground)
 

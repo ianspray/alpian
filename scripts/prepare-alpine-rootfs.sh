@@ -112,8 +112,10 @@ printf '  - %s\n' "${package_args[@]}"
   add "${package_args[@]}"
 
 cat >"$ROOTFS_DIR/etc/fstab" <<'EOF'
-LABEL=config /media/config vfat defaults 0 2
-LABEL=efi /boot/efi vfat defaults 0 2
+# Keep persistent partitions read-only during normal operation.
+# lbu temporarily remounts config as writable during commit/revert.
+LABEL=config /media/config vfat ro,noatime 0 2
+LABEL=efi /boot/efi vfat ro,noatime 0 2
 LABEL=rootfs / ext4 defaults 0 1
 EOF
 
