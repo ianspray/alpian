@@ -251,6 +251,8 @@ log "Target NVMe device: $TARGET_NVME_DEVICE"
 EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
 DISABLED_EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf.disabled"
 DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
+ROOT_EXTLINUX_PRIMARY="/boot/extlinux/extlinux.conf"
+ROOT_EXTLINUX_ALT="/extlinux/extlinux.conf"
 mounted_here=0
 remounted_rw=0
 efi_state_persist=1
@@ -277,8 +279,24 @@ fi
 EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
 DISABLED_EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf.disabled"
 DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
+
+disable_root_extlinux() {
+  local f=""
+  for f in "$ROOT_EXTLINUX_PRIMARY" "$ROOT_EXTLINUX_ALT"; do
+    if [ -f "$f" ]; then
+      if ! mv "$f" "${f}.disabled"; then
+        log "Warning: failed to disable USB rootfs boot entry: $f"
+      fi
+    fi
+  done
+}
+
 if [ -f "$DONE_MARKER" ]; then
   log "Update already completed on this USB media; skipping."
+  disable_root_extlinux
+  if [ "$efi_state_persist" -eq 1 ] && [ -f "$EXTLINUX_CONF" ]; then
+    mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF" || log "Warning: failed to disable updater EFI extlinux entry."
+  fi
   if [ "$mounted_here" -eq 1 ]; then
     umount "$UPDATER_EFI_MOUNT" || true
   fi
@@ -319,7 +337,8 @@ if command -v udevadm >/dev/null 2>&1; then
   udevadm settle || true
 fi
 
-log "Disabling USB updater boot entry so next boot falls through to NVMe..."
+log "Disabling USB updater boot entries so next boot falls through to NVMe..."
+disable_root_extlinux
 if [ "$efi_state_persist" -eq 1 ]; then
   if [ -f "$EXTLINUX_CONF" ]; then
     if ! mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF"; then

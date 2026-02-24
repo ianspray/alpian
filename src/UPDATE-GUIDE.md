@@ -287,13 +287,15 @@ If persistent environment is not available, this must be set in the SPI U-Boot b
 2. Reboot/power-cycle E54C.
 3. U-Boot boots USB updater image.
 4. OpenRC service `e54c-usb-nvme-update` verifies payload checksum and flashes NVMe.
-5. On success, updater renames USB `/extlinux/extlinux.conf` to `.disabled`.
+5. On success, updater disables USB extlinux entries in both locations:
+   - EFI: `/extlinux/extlinux.conf` -> `.disabled`
+   - Rootfs: `/boot/extlinux/extlinux.conf` -> `.disabled`
 6. Updater reboots.
 7. U-Boot no longer sees bootable extlinux on USB and falls through to NVMe.
 
 ### Why This Avoids Boot Loops
 
-1. USB media self-disables its own extlinux entry only after successful flash.
+1. USB media self-disables both of its extlinux entry locations only after successful flash.
 2. Leaving the USB stick inserted still results in NVMe boot on the next cycle.
 
 ### Key Environment Knobs

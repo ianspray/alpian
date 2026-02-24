@@ -83,7 +83,7 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - Includes compressed payload derived from `build/e54c-alpine-custom.img`
   - Boots a maintenance-style updater profile from USB
   - Auto-runs `e54c-usb-nvme-update` service to flash `/dev/nvme0n1`
-  - Disables its own USB `/extlinux/extlinux.conf` after successful flash
+  - Disables USB boot entries on both EFI (`/extlinux/extlinux.conf`) and rootfs (`/boot/extlinux/extlinux.conf`) after successful flash
   - Reboots so U-Boot can fall through to NVMe on next boot
 - Alpine rootfs defaults:
   - Serial-only login on `ttyFIQ0` at `1500000` baud
