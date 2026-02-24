@@ -1,0 +1,9 @@
+# Optional additional APK repositories used at image build and runtime.
+# One repository URL/path per line. Comment lines are ignored.
+# Local repo at `build/apk-repo/v3.23` is auto-detected when present.
+#
+# Example (HTTP host):
+# http://192.168.1.10:8080/v3.23
+#
+# Example (HTTPS host):
+# https://updates.example.com/e54c/apk/v3.23

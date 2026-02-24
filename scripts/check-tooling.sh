@@ -11,6 +11,7 @@ required_cmds=(
   debootstrap unsquashfs xorriso isoinfo binwalk
   guestfish guestmount qemu-img mcopy mdir dtc mkimage
   dd truncate tar curl sha256sum
+  podman
 )
 
 missing=()
@@ -27,4 +28,3 @@ if [ "${#missing[@]}" -gt 0 ]; then
 fi
 
 echo "All required tooling is available."
-

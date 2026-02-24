@@ -14,6 +14,11 @@ HOST_ARCH="${HOST_ARCH:-$(uname -m)}"
 APK_CACHE_DIR="${APK_CACHE_DIR:-$REPO_ROOT/build/apk-cache}"
 ALPINE_PACKAGES="${ALPINE_PACKAGES:-}"
 ALPINE_PACKAGE_LIST_FILE="${ALPINE_PACKAGE_LIST_FILE:-$REPO_ROOT/assets/reference/alpine/packages.txt}"
+CUSTOM_APK_REPOSITORIES_FILE="${CUSTOM_APK_REPOSITORIES_FILE:-$REPO_ROOT/assets/reference/alpine/custom-repositories.txt}"
+CUSTOM_APK_PACKAGES_FILE="${CUSTOM_APK_PACKAGES_FILE:-$REPO_ROOT/assets/reference/alpine/custom-packages.txt}"
+CUSTOM_APK_KEYS_DIR="${CUSTOM_APK_KEYS_DIR:-$REPO_ROOT/assets/reference/alpine/custom-keys}"
+LOCAL_CUSTOM_APK_REPO_DIR="${LOCAL_CUSTOM_APK_REPO_DIR:-$REPO_ROOT/build/apk-repo/$ALPINE_BRANCH}"
+LOCAL_CUSTOM_APK_KEYS_DIR="${LOCAL_CUSTOM_APK_KEYS_DIR:-$REPO_ROOT/build/apk-repo/keys}"
 SERIAL_TTY="${SERIAL_TTY:-ttyFIQ0}"
 SERIAL_BAUD="${SERIAL_BAUD:-1500000}"
 ROOT_AUTHORIZED_KEYS_FILE="${ROOT_AUTHORIZED_KEYS_FILE-__AUTO__}"
@@ -72,10 +77,39 @@ rm -rf "$ROOTFS_DIR"
 mkdir -p "$ROOTFS_DIR"
 tar -xzf "$MINIROOTFS_PATH" -C "$ROOTFS_DIR"
 
-cat >"$ROOTFS_DIR/etc/apk/repositories" <<EOF
-${ALPINE_MIRROR}/${ALPINE_BRANCH}/main
-${ALPINE_MIRROR}/${ALPINE_BRANCH}/community
-EOF
+repo_lines=(
+  "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main"
+  "${ALPINE_MIRROR}/${ALPINE_BRANCH}/community"
+)
+custom_repo_count=0
+if [ -f "$CUSTOM_APK_REPOSITORIES_FILE" ]; then
+  while IFS= read -r line; do
+    line="$(printf '%s' "$line" | sed -E 's/[[:space:]]*#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//')"
+    if [ -n "$line" ]; then
+      repo_lines+=("$line")
+      custom_repo_count=$((custom_repo_count + 1))
+    fi
+  done <"$CUSTOM_APK_REPOSITORIES_FILE"
+fi
+
+if [ -f "$LOCAL_CUSTOM_APK_REPO_DIR/$ALPINE_ARCH/APKINDEX.tar.gz" ]; then
+  repo_lines+=("$LOCAL_CUSTOM_APK_REPO_DIR")
+  custom_repo_count=$((custom_repo_count + 1))
+fi
+
+printf '%s\n' "${repo_lines[@]}" >"$ROOTFS_DIR/etc/apk/repositories"
+
+copy_apk_keys() {
+  local key_dir="$1"
+  [ -d "$key_dir" ] || return 0
+  mkdir -p "$ROOTFS_DIR/etc/apk/keys"
+  while IFS= read -r key_file; do
+    cp "$key_file" "$ROOTFS_DIR/etc/apk/keys/"
+  done < <(find "$key_dir" -maxdepth 1 -type f -name '*.pub' | sort)
+}
+
+copy_apk_keys "$CUSTOM_APK_KEYS_DIR"
+copy_apk_keys "$LOCAL_CUSTOM_APK_KEYS_DIR"
 
 # Install additional Alpine packages from the host using apk.static.
 HOST_APKINDEX="${DOWNLOAD_DIR}/APKINDEX-${ALPINE_BRANCH}-${HOST_ARCH}.tar.gz"
@@ -99,15 +133,45 @@ APK_STATIC="$tmp_work/sbin/apk.static"
 chmod +x "$APK_STATIC"
 
 package_args=()
-if [ -n "$ALPINE_PACKAGES" ]; then
-  read -r -a package_args <<<"$ALPINE_PACKAGES"
-elif [ -f "$ALPINE_PACKAGE_LIST_FILE" ]; then
+append_pkg_unique() {
+  local pkg="$1"
+  local existing=""
+  for existing in "${package_args[@]}"; do
+    if [ "$existing" = "$pkg" ]; then
+      return 0
+    fi
+  done
+  package_args+=("$pkg")
+}
+
+read_package_file() {
+  local package_file="$1"
+  [ -f "$package_file" ] || return 0
   while IFS= read -r line; do
     line="$(printf '%s' "$line" | sed -E 's/[[:space:]]*#.*$//; s/^[[:space:]]+//; s/[[:space:]]+$//')"
     if [ -n "$line" ]; then
-      package_args+=("$line")
+      append_pkg_unique "$line"
     fi
-  done <"$ALPINE_PACKAGE_LIST_FILE"
+  done <"$package_file"
+}
+
+if [ -n "$ALPINE_PACKAGES" ]; then
+  read -r -a _user_package_args <<<"$ALPINE_PACKAGES"
+  for pkg in "${_user_package_args[@]}"; do
+    append_pkg_unique "$pkg"
+  done
+elif [ -f "$ALPINE_PACKAGE_LIST_FILE" ]; then
+  read_package_file "$ALPINE_PACKAGE_LIST_FILE"
+fi
+
+if [ "$custom_repo_count" -gt 0 ]; then
+  read_package_file "$CUSTOM_APK_PACKAGES_FILE"
+elif [ -f "$CUSTOM_APK_PACKAGES_FILE" ]; then
+  if grep -Eq '^[[:space:]]*[^#[:space:]]' "$CUSTOM_APK_PACKAGES_FILE"; then
+    echo "Custom packages are configured in $CUSTOM_APK_PACKAGES_FILE but no custom APK repository is available." >&2
+    echo "Run scripts/build-apk-repo.sh first, or configure CUSTOM_APK_REPOSITORIES_FILE." >&2
+    exit 1
+  fi
 fi
 
 if [ "${#package_args[@]}" -eq 0 ]; then
@@ -120,6 +184,7 @@ printf '  - %s\n' "${package_args[@]}"
   --usermode \
   --arch "$ALPINE_ARCH" \
   --root "$ROOTFS_DIR" \
+  --keys-dir "$ROOTFS_DIR/etc/apk/keys" \
   --repositories-file "$ROOTFS_DIR/etc/apk/repositories" \
   --cache-dir "$APK_CACHE_DIR" \
   --no-scripts \
@@ -218,84 +283,20 @@ enable_service() {
   ln -snf "/etc/init.d/$service" "$ROOTFS_DIR/etc/runlevels/$level/$service"
 }
 
-# Template service for fixed USB/peripheral permissions in devtmpfs-only setups.
-cat >"$ROOTFS_DIR/etc/conf.d/e54c-dev-perms" <<'EOF'
-# Wait this many seconds before applying permissions (gives drivers time to create nodes).
-wait_seconds=3
-
-# Rule format:
-#   <glob> <owner:group> <mode>
-#
-# Examples:
-# /dev/ttyUSB* root:dialout 0660
-# /dev/video* root:video 0660
-# /dev/hidraw* root:root 0660
-EOF
-
-mkdir -p "$ROOTFS_DIR/usr/local/sbin"
-cat >"$ROOTFS_DIR/usr/local/sbin/e54c-apply-dev-perms" <<'EOF'
-#!/bin/sh
-set -eu
-
-CONF_FILE="/etc/conf.d/e54c-dev-perms"
-[ -f "$CONF_FILE" ] || exit 0
-
-wait_seconds="$(awk -F= '/^[[:space:]]*wait_seconds[[:space:]]*=/{gsub(/[[:space:]]|"/,"",$2); print $2; exit}' "$CONF_FILE" 2>/dev/null || true)"
-case "${wait_seconds:-}" in
-  ''|*[!0-9]*) wait_seconds=3 ;;
-esac
-[ "$wait_seconds" -gt 0 ] && sleep "$wait_seconds"
-
-awk '
-  /^[[:space:]]*#/ {next}
-  /^[[:space:]]*$/ {next}
-  {
-    pattern=$1; owner=$2; mode=$3
-    if (pattern=="" || owner=="" || mode=="") next
-    print pattern, owner, mode
-  }
-' "$CONF_FILE" | while read -r pattern owner mode; do
-  matched=0
-  for node in $pattern; do
-    [ -e "$node" ] || continue
-    matched=1
-    chown "$owner" "$node" 2>/dev/null || true
-    chmod "$mode" "$node" 2>/dev/null || true
-  done
-  [ "$matched" -eq 1 ] || true
-done
-EOF
-chmod 0755 "$ROOTFS_DIR/usr/local/sbin/e54c-apply-dev-perms"
-
-cat >"$ROOTFS_DIR/etc/init.d/e54c-dev-perms" <<'EOF'
-#!/sbin/openrc-run
-
-name="e54c-dev-perms"
-description="Apply custom device-node permissions for fixed peripherals"
-
-depend() {
-  need modules
-  before networking
-}
-
-start() {
-  ebegin "Applying custom device permissions"
-  /usr/local/sbin/e54c-apply-dev-perms
-  eend 0
-}
-EOF
-chmod 0755 "$ROOTFS_DIR/etc/init.d/e54c-dev-perms"
-
 for svc in devfs dmesg procfs sysfs; do
   enable_service "$svc" sysinit
 done
 for svc in modules sysctl hostname bootmisc swclock localmount; do
   enable_service "$svc" boot
 done
-enable_service e54c-dev-perms boot
 for svc in networking sshd; do
   enable_service "$svc" default
 done
+enable_service e54c-dev-perms boot
+enable_service e54c-bootmode-oneshot boot
+if [ "$ENFORCE_IMMUTABLE_ROOT" = "1" ]; then
+  enable_service e54c-root-mode boot
+fi
 
 # Optional: preload root authorized_keys for headless SSH access.
 if [ -n "$ROOT_AUTHORIZED_KEYS_FILE" ]; then
@@ -324,402 +325,22 @@ if [ -n "$ROOT_PASSWORD_HASH" ] && [ -f "$ROOTFS_DIR/etc/shadow" ]; then
 fi
 
 if [ "$ENABLE_BOOT_NET_BANNER" = "1" ]; then
-  mkdir -p "$ROOTFS_DIR/usr/local/sbin"
-  cat >"$ROOTFS_DIR/usr/local/sbin/show-net-addrs" <<EOF
-#!/bin/sh
-set -eu
-
-SERIAL_TTY="${SERIAL_TTY}"
-WAIT_SECONDS="\${NET_ADDR_WAIT_SECONDS:-40}"
-BANNER_TITLE="${BOOT_BANNER_TITLE}"
-
-collect_addrs() {
-  ip -o -4 addr show scope global 2>/dev/null | awk '{print "IPv4 " \$2 " " \$4}'
-  ip -o -6 addr show scope global 2>/dev/null | awk '{print "IPv6 " \$2 " " \$4}'
-}
-
-start_ts=\$(date +%s)
-addrs=""
-while :; do
-  addrs="\$(collect_addrs | sort -u || true)"
-  [ -n "\$addrs" ] && break
-  now=\$(date +%s)
-  [ \$((now - start_ts)) -ge "\$WAIT_SECONDS" ] && break
-  sleep 1
-done
-
-issue_base_file="/etc/issue.base"
-[ -f "\$issue_base_file" ] || cp /etc/issue "\$issue_base_file" 2>/dev/null || true
-{
-  if [ -f "\$issue_base_file" ]; then
-    cat "\$issue_base_file"
-  else
-    echo "Alpine Linux"
-  fi
-  echo
-  if [ -n "\$BANNER_TITLE" ]; then
-    echo "\$BANNER_TITLE"
-    echo
-  fi
-  echo "Network addresses:"
-  if [ -n "\$addrs" ]; then
-    echo "\$addrs"
-  else
-    echo "No global DHCP address acquired yet."
-  fi
-} >/etc/issue
-
-{
-  echo
-  if [ -n "\$BANNER_TITLE" ]; then
-    echo "=== \$BANNER_TITLE ==="
-  fi
-  echo "=== Network Addresses ==="
-  if [ -n "\$addrs" ]; then
-    echo "\$addrs"
-  else
-    echo "No global DHCP address acquired yet."
-  fi
-  echo "========================="
-  echo
-} >/run/network-addresses.banner
-
-cat /run/network-addresses.banner >/dev/console 2>/dev/null || true
-if [ -c "/dev/\$SERIAL_TTY" ]; then
-  cat /run/network-addresses.banner >"/dev/\$SERIAL_TTY" 2>/dev/null || true
-fi
+  mkdir -p "$ROOTFS_DIR/etc/conf.d"
+  cat >"$ROOTFS_DIR/etc/conf.d/show-net-addrs" <<EOF
+serial_tty="${SERIAL_TTY}"
+wait_seconds=40
+banner_title="${BOOT_BANNER_TITLE}"
 EOF
-  chmod 0755 "$ROOTFS_DIR/usr/local/sbin/show-net-addrs"
-
-cat >"$ROOTFS_DIR/etc/init.d/show-net-addrs" <<'EOF'
-#!/sbin/openrc-run
-
-name="show-net-addrs"
-description="Show network addresses on console and login banner"
-
-depend() {
-  need networking
-  after sshd
-}
-
-start() {
-  ebegin "Updating login banner with network addresses"
-  /usr/local/sbin/show-net-addrs >/dev/null 2>&1 || true
-  eend 0
-}
-EOF
-  chmod 0755 "$ROOTFS_DIR/etc/init.d/show-net-addrs"
   enable_service show-net-addrs default
 fi
 
 if [ "$ENABLE_BOOT_NTP_SYNC" = "1" ]; then
+  mkdir -p "$ROOTFS_DIR/etc/conf.d"
   cat >"$ROOTFS_DIR/etc/conf.d/e54c-ntp-sync" <<EOF
 # Space-separated list of NTP servers for one-shot boot sync.
 servers="${BOOT_NTP_SERVERS}"
 EOF
-
-  cat >"$ROOTFS_DIR/etc/init.d/e54c-ntp-sync" <<'EOF'
-#!/sbin/openrc-run
-
-name="e54c-ntp-sync"
-description="Run one-shot NTP sync in background"
-
-depend() {
-  need networking
-  before sshd
-}
-
-start() {
-  ebegin "Triggering background NTP sync"
-  (
-    if [ -f /run/e54c-ntp-sync.done ]; then
-      exit 0
-    fi
-    : "${servers:=pool.ntp.org}"
-    ntp_cmd="$(command -v ntpd || true)"
-    if [ -n "$ntp_cmd" ]; then
-      ntp_invoke="$ntp_cmd"
-    else
-      ntp_invoke="/bin/busybox ntpd"
-    fi
-    args=""
-    for s in $servers; do
-      args="$args -p $s"
-    done
-    # One-shot sync; run detached so boot/login is never blocked.
-    sh -c "$ntp_invoke -q -n $args >/run/e54c-ntp-sync.log 2>&1 || true"
-    touch /run/e54c-ntp-sync.done
-  ) &
-  eend 0
-}
-EOF
-  chmod 0755 "$ROOTFS_DIR/etc/init.d/e54c-ntp-sync"
   enable_service e54c-ntp-sync default
-fi
-
-mkdir -p "$ROOTFS_DIR/usr/local/sbin"
-cat >"$ROOTFS_DIR/usr/local/sbin/e54c-boot-mode" <<'EOF'
-#!/bin/sh
-set -eu
-
-EFI_MOUNT="/boot/efi"
-CONFIG_MOUNT="/media/config"
-EXTLINUX_CONF="$EFI_MOUNT/extlinux/extlinux.conf"
-NEXT_FILE="$CONFIG_MOUNT/boot-mode.next"
-
-usage() {
-  cat <<'USAGE'
-Usage:
-  e54c-boot-mode status
-  e54c-boot-mode next-maintenance
-  e54c-boot-mode cancel-next
-  e54c-boot-mode set-default immutable|maintenance
-  e54c-boot-mode reboot-maintenance
-  e54c-boot-mode reboot-immutable
-USAGE
-}
-
-require_root() {
-  if [ "$(id -u)" -ne 0 ]; then
-    echo "This command must run as root." >&2
-    exit 1
-  fi
-}
-
-ensure_mounts() {
-  mountpoint -q "$EFI_MOUNT" || mount "$EFI_MOUNT"
-  mountpoint -q "$CONFIG_MOUNT" || mount "$CONFIG_MOUNT"
-}
-
-set_default_label() {
-  label="$1"
-  tmp="$(mktemp)"
-  awk -v lbl="$label" '
-    BEGIN { done=0 }
-    /^[[:space:]]*DEFAULT[[:space:]]+/ && done==0 {
-      print "DEFAULT " lbl
-      done=1
-      next
-    }
-    { print }
-    END {
-      if (done==0) exit 2
-    }
-  ' "$EXTLINUX_CONF" >"$tmp"
-  cat "$tmp" >"$EXTLINUX_CONF"
-  rm -f "$tmp"
-}
-
-get_default_label() {
-  awk '/^[[:space:]]*DEFAULT[[:space:]]+/ {print $2; exit}' "$EXTLINUX_CONF"
-}
-
-get_next_mode() {
-  if [ -f "$NEXT_FILE" ]; then
-    cat "$NEXT_FILE"
-  else
-    echo "none"
-  fi
-}
-
-current_mode() {
-  if grep -qw 'overlaytmpfs=yes' /proc/cmdline; then
-    echo "immutable"
-  else
-    echo "maintenance"
-  fi
-}
-
-set_ro_mounts() {
-  mount -o remount,ro "$EFI_MOUNT" || true
-  mount -o remount,ro "$CONFIG_MOUNT" || true
-}
-
-set_rw_mounts() {
-  mount -o remount,rw "$CONFIG_MOUNT"
-  mount -o remount,rw "$EFI_MOUNT"
-}
-
-cmd="${1:-status}"
-case "$cmd" in
-  status)
-    ensure_mounts
-    echo "Current mode: $(current_mode)"
-    echo "Default next-boot label: $(get_default_label)"
-    echo "One-shot next mode: $(get_next_mode)"
-    ;;
-  next-maintenance)
-    require_root
-    ensure_mounts
-    set_rw_mounts
-    echo "maintenance-once" >"$NEXT_FILE"
-    set_default_label maintenance
-    sync
-    set_ro_mounts
-    echo "Scheduled one-shot maintenance boot."
-    ;;
-  cancel-next)
-    require_root
-    ensure_mounts
-    set_rw_mounts
-    rm -f "$NEXT_FILE"
-    set_default_label immutable
-    sync
-    set_ro_mounts
-    echo "Cancelled one-shot boot and restored immutable default."
-    ;;
-  set-default)
-    require_root
-    mode="${2:-}"
-    case "$mode" in
-      immutable|maintenance) ;;
-      *)
-        echo "set-default requires immutable|maintenance" >&2
-        exit 1
-        ;;
-    esac
-    ensure_mounts
-    set_rw_mounts
-    set_default_label "$mode"
-    sync
-    set_ro_mounts
-    echo "Default boot label set to: $mode"
-    ;;
-  reboot-maintenance)
-    "$0" next-maintenance
-    exec /sbin/reboot
-    ;;
-  reboot-immutable)
-    "$0" cancel-next
-    exec /sbin/reboot
-    ;;
-  *)
-    usage >&2
-    exit 1
-    ;;
-esac
-EOF
-chmod 0755 "$ROOTFS_DIR/usr/local/sbin/e54c-boot-mode"
-
-cat >"$ROOTFS_DIR/usr/local/sbin/e54c-bootmode-oneshot-apply" <<'EOF'
-#!/bin/sh
-set -eu
-
-EFI_MOUNT="/boot/efi"
-CONFIG_MOUNT="/media/config"
-EXTLINUX_CONF="$EFI_MOUNT/extlinux/extlinux.conf"
-NEXT_FILE="$CONFIG_MOUNT/boot-mode.next"
-
-[ -f "$NEXT_FILE" ] || exit 0
-[ -f "$EXTLINUX_CONF" ] || exit 0
-
-if [ "$(cat "$NEXT_FILE" 2>/dev/null || true)" != "maintenance-once" ]; then
-  exit 0
-fi
-
-# Clear one-shot only after we have successfully booted the maintenance profile.
-if grep -qw 'overlaytmpfs=yes' /proc/cmdline; then
-  exit 0
-fi
-
-mountpoint -q "$CONFIG_MOUNT" || exit 0
-mountpoint -q "$EFI_MOUNT" || exit 0
-
-mount -o remount,rw "$CONFIG_MOUNT" || exit 0
-if ! mount -o remount,rw "$EFI_MOUNT"; then
-  mount -o remount,ro "$CONFIG_MOUNT" || true
-  exit 0
-fi
-
-tmp="$(mktemp)"
-awk '
-  BEGIN { done=0 }
-  /^[[:space:]]*DEFAULT[[:space:]]+/ && done==0 {
-    print "DEFAULT immutable"
-    done=1
-    next
-  }
-  { print }
-  END {
-    if (done==0) exit 2
-  }
-' "$EXTLINUX_CONF" >"$tmp"
-cat "$tmp" >"$EXTLINUX_CONF"
-rm -f "$tmp"
-rm -f "$NEXT_FILE"
-sync
-
-mount -o remount,ro "$EFI_MOUNT" || true
-mount -o remount,ro "$CONFIG_MOUNT" || true
-EOF
-chmod 0755 "$ROOTFS_DIR/usr/local/sbin/e54c-bootmode-oneshot-apply"
-
-cat >"$ROOTFS_DIR/etc/init.d/e54c-bootmode-oneshot" <<'EOF'
-#!/sbin/openrc-run
-
-name="e54c-bootmode-oneshot"
-description="Apply one-shot maintenance boot mode and restore immutable default"
-
-depend() {
-  need localmount
-  before networking
-}
-
-start() {
-  ebegin "Applying one-shot boot mode state"
-  /usr/local/sbin/e54c-bootmode-oneshot-apply >/dev/null 2>&1 || true
-  eend 0
-}
-EOF
-chmod 0755 "$ROOTFS_DIR/etc/init.d/e54c-bootmode-oneshot"
-enable_service e54c-bootmode-oneshot boot
-
-if [ "$ENFORCE_IMMUTABLE_ROOT" = "1" ]; then
-  cat >"$ROOTFS_DIR/etc/init.d/e54c-root-mode" <<'EOF'
-#!/sbin/openrc-run
-
-name="e54c-root-mode"
-description="Apply immutable/maintenance root mount mode"
-
-depend() {
-  need localmount
-  before networking
-}
-
-start() {
-  ebegin "Applying root mount mode"
-
-  root_fs_type="$(awk '$2=="/"{print $3; exit}' /proc/mounts 2>/dev/null || true)"
-  if [ -z "$root_fs_type" ] && command -v findmnt >/dev/null 2>&1; then
-    root_fs_type="$(findmnt -n -o FSTYPE / 2>/dev/null || true)"
-  fi
-
-  case " $(cat /proc/cmdline 2>/dev/null) " in
-    *" diskless=yes "*|*" diskless=1 "*)
-      if [ "$root_fs_type" = "tmpfs" ]; then
-        einfo "Diskless mode active with tmpfs root."
-      else
-        ewarn "diskless mode requested but root is '$root_fs_type'."
-      fi
-      ;;
-    *" overlaytmpfs=yes "*)
-      if [ "$root_fs_type" = "overlay" ]; then
-        einfo "Immutable mode active with overlay rootfs."
-      else
-        if mount -o remount,ro / 2>/dev/null; then
-          ewarn "overlaytmpfs requested but overlay rootfs not active; remounted / read-only."
-        else
-          ewarn "overlaytmpfs requested but could not remount / read-only."
-        fi
-      fi
-      ;;
-  esac
-
-  eend 0
-}
-EOF
-  chmod 0755 "$ROOTFS_DIR/etc/init.d/e54c-root-mode"
-  enable_service e54c-root-mode boot
 fi
 
 # busybox-suid installs bbsuid as execute-only in usermode; make it readable for tar packaging.

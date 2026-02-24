@@ -1,0 +1,15 @@
+#!/sbin/openrc-run
+
+name="e54c-dev-perms"
+description="Apply custom device-node permissions for fixed peripherals"
+
+depend() {
+  need modules
+  before networking
+}
+
+start() {
+  ebegin "Applying custom device permissions"
+  /usr/sbin/e54c-apply-dev-perms
+  eend 0
+}

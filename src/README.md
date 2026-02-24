@@ -13,6 +13,7 @@ Run commands from the repository root.
 
 ```bash
 scripts/check-tooling.sh
+scripts/build-apk-repo.sh
 scripts/build-kernel-e54c.sh
 scripts/prepare-alpine-rootfs.sh
 scripts/assemble-e54c-image.sh
@@ -34,6 +35,24 @@ Build patched SPI U-Boot for E54C USB host bring-up:
 
 ```bash
 scripts/build-uboot-e54c-spi.sh
+```
+
+Build/sign all custom APK packages in `apk/aports`:
+
+```bash
+scripts/build-apk-repo.sh
+```
+
+Serve the generated custom APK repository over HTTP:
+
+```bash
+scripts/serve-apk-repo.sh
+```
+
+Create a new OpenRC APK skeleton:
+
+```bash
+scripts/new-openrc-apk.sh <package-name> <service-name>
 ```
 
 Write the generated combined SPI image directly to flash (example):
@@ -91,11 +110,11 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - Non-blocking one-shot NTP sync is triggered at boot after networking (`e54c-ntp-sync`)
   - Default boot DTB is `rk3588s-radxa-e54c-spi.dtb`
   - Initramfs (`/boot/initramfs-e54c.cpio.gz`) is generated during image assembly
-  - Main image boots a single diskless profile by default (U-Boot option 1 only)
+- Main image boots a single diskless profile by default (U-Boot option 1 only)
   - Initramfs mounts source root partition read-only, populates tmpfs root, then `switch_root`s into RAM root
   - `mdev` service is not enabled; device discovery is via kernel + `devtmpfs`
   - Template service `e54c-dev-perms` applies optional custom `/dev` permissions at boot from `/etc/conf.d/e54c-dev-perms`
-  - One-shot mode switch helper available on target: `/usr/local/sbin/e54c-boot-mode`
+  - One-shot mode switch helper available on target: `/usr/sbin/e54c-boot-mode`
   - E54C network defaults: DHCP client on `wan`; `lan1`/`lan2`/`lan3` set to `manual`
   - E54C DSA/Realtek modules are force-loaded via `/etc/modules` at boot
   - Boot-time console/login banner prints currently assigned global IP addresses
@@ -103,7 +122,10 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `config` and `efi` partitions are mounted read-only in normal operation
   - `/etc/apk/cache` points to `/media/config/cache`; remount `config` read-write for maintenance/package operations
   - Root `authorized_keys` is auto-populated from `assets/reference/alpine/root_authorized_keys` when present
-  - Temporary root password enabled for serial bring-up: `alpine`
+- Temporary root password enabled for serial bring-up: `alpine`
+  - Custom OpenRC behavior is shipped as APKs:
+    - `e54c-openrc-services` (main image boot/runtime helpers)
+    - `e54c-usb-updater-services` (USB updater flash flow)
 
 ## Customization
 
@@ -112,6 +134,13 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
 - Override default package set:
   - Edit `assets/reference/alpine/packages.txt` (one package per line)
   - or override ad hoc with `ALPINE_PACKAGES="alpine-base alpine-conf openssh curl" scripts/prepare-alpine-rootfs.sh`
+- Add custom package repositories for image builds/runtime:
+  - Edit `assets/reference/alpine/custom-repositories.txt`
+- Add custom package names from those repositories:
+  - Edit `assets/reference/alpine/custom-packages.txt`
+- Add custom APK signing keys used by those repositories:
+  - Place `.rsa.pub` key files in `assets/reference/alpine/custom-keys/`
+  - Or build locally with `scripts/build-apk-repo.sh` (Podman) and use the auto-detected local repo in `build/apk-repo/v3.23`
 - Inject root SSH authorized keys during image build:
   - `ROOT_AUTHORIZED_KEYS_FILE=/path/to/authorized_keys scripts/prepare-alpine-rootfs.sh`
 - Disable default key injection:

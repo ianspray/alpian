@@ -111,6 +111,24 @@ Use Alpine packaging workflow:
    - repository path in `/etc/apk/repositories`, or
    - `apk add --repository /path/to/repo mytool`
 
+Repository tooling available in this project:
+
+1. Place `APKBUILD` packages under `apk/aports/<namespace>/<package>/`.
+2. Build/sign all packages:
+   - `scripts/build-apk-repo.sh`
+   - uses Podman (rootless-compatible)
+3. Serve the repo for image builds:
+   - `scripts/serve-apk-repo.sh`
+4. Add repo URL(s) to:
+   - `assets/reference/alpine/custom-repositories.txt`
+5. Add package names to:
+   - `assets/reference/alpine/custom-packages.txt`
+6. Rebuild image:
+   - `scripts/prepare-alpine-rootfs.sh`
+   - `scripts/assemble-e54c-image.sh`
+
+If a local repo exists at `build/apk-repo/v3.23`, `prepare-alpine-rootfs.sh` auto-adds it and auto-imports keys from `build/apk-repo/keys`.
+
 ## Integrating with This Repo
 
 For packages known to be required at runtime:
@@ -124,16 +142,14 @@ This keeps runtime `lbu` data small because package payload is in the base image
 
 Current image runtime model:
 
-1. Default boot uses immutable root (`overlaytmpfs=yes`).
+1. Default boot is true diskless (`diskless=yes`) with root in RAM.
 2. Writes are RAM-backed unless explicitly persisted.
-3. Use maintenance boot profile for persistent package/base-system changes.
-4. Use `lbu commit` for explicit config persistence to `config` media.
+3. Use `lbu commit` for explicit config persistence to `config` media.
 
 For ad-hoc runtime packages:
 
 1. `apk add ...`
-2. If running diskless mode, commit with `lbu commit`.
-3. If using ext4 rootfs mode (current default), package payload persists on rootfs; use `lbu` for config/state capture policy.
+2. Commit with `lbu commit` if you want package/config persistence.
 
 ## Handling Many Custom Packages
 

@@ -7,3 +7,11 @@ openssh
 mtd-utils
 dosfstools
 e2fsprogs
+inotify-tools
+avahi
+vim
+curl
+file
+jq
+cfdisk
+tree
