@@ -5,3 +5,4 @@ alpine-base
 alpine-conf
 openssh
 mtd-utils
+dosfstools
