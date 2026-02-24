@@ -78,6 +78,7 @@ ROOT_PARTLABEL_REQUIRED="${ROOT_PARTLABEL_REQUIRED:-updater-rootfs}"
 TARGET_WAIT_SECONDS="${TARGET_WAIT_SECONDS:-120}"
 UPDATER_EFI_MOUNT="/run/e54c-updater-efi"
 LOCK_DIR="/run/e54c-usb-update.lock"
+BOOT_DONE_MARKER="/run/e54c-usb-update.done"
 
 log() {
   echo "[e54c-usb-updater] $*"
@@ -93,6 +94,11 @@ cleanup() {
   rmdir "$LOCK_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
+
+if [ -f "$BOOT_DONE_MARKER" ]; then
+  log "Updater already flashed image in this boot; skipping."
+  exit 0
+fi
 
 if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null; then
   log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED)."
@@ -246,13 +252,26 @@ EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
 DISABLED_EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf.disabled"
 DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
 mounted_here=0
+remounted_rw=0
+efi_state_persist=1
 existing_mountpoint="$(awk -v dev="$efi_dev" '$1==dev{print $2; exit}' /proc/mounts 2>/dev/null || true)"
 if [ -n "$existing_mountpoint" ]; then
+  existing_mountopts="$(awk -v dev="$efi_dev" '$1==dev{print $4; exit}' /proc/mounts 2>/dev/null || true)"
   UPDATER_EFI_MOUNT="$existing_mountpoint"
   log "Using existing EFI mountpoint: $UPDATER_EFI_MOUNT"
+  case ",$existing_mountopts," in
+    *,ro,*)
+      if mount -o remount,rw "$UPDATER_EFI_MOUNT"; then
+        remounted_rw=1
+      else
+        log "Warning: cannot remount EFI partition read-write; updater boot entry will not be disabled."
+        efi_state_persist=0
+      fi
+      ;;
+  esac
 else
   mkdir -p "$UPDATER_EFI_MOUNT"
-  mount "$efi_dev" "$UPDATER_EFI_MOUNT"
+  mount -o rw "$efi_dev" "$UPDATER_EFI_MOUNT"
   mounted_here=1
 fi
 EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
@@ -274,12 +293,23 @@ dd_status_arg=""
 if dd --help 2>&1 | grep -q "status=progress"; then
   dd_status_arg="status=progress"
 fi
-if [ -n "$dd_status_arg" ]; then
-  zstd -dc "$PAYLOAD_FILE" | dd of="$TARGET_NVME_DEVICE" bs=8M iflag=fullblock conv=fsync "$dd_status_arg"
-else
-  zstd -dc "$PAYLOAD_FILE" | dd of="$TARGET_NVME_DEVICE" bs=8M iflag=fullblock conv=fsync
-fi
+flash_payload() {
+  if [ -n "$dd_status_arg" ]; then
+    zstd -dc "$PAYLOAD_FILE" | dd of="$TARGET_NVME_DEVICE" bs=8M iflag=fullblock conv=fsync "$dd_status_arg"
+  else
+    zstd -dc "$PAYLOAD_FILE" | dd of="$TARGET_NVME_DEVICE" bs=8M iflag=fullblock conv=fsync
+  fi
+}
+
+flash_payload &
+flash_pid=$!
+while kill -0 "$flash_pid" 2>/dev/null; do
+  log "Flashing in progress..."
+  sleep 5
+done
+wait "$flash_pid"
 sync
+touch "$BOOT_DONE_MARKER"
 
 if command -v partprobe >/dev/null 2>&1; then
   partprobe "$TARGET_NVME_DEVICE" || true
@@ -290,11 +320,22 @@ if command -v udevadm >/dev/null 2>&1; then
 fi
 
 log "Disabling USB updater boot entry so next boot falls through to NVMe..."
-if [ -f "$EXTLINUX_CONF" ]; then
-  mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF"
+if [ "$efi_state_persist" -eq 1 ]; then
+  if [ -f "$EXTLINUX_CONF" ]; then
+    if ! mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF"; then
+      log "Warning: failed to disable updater extlinux entry."
+    fi
+  fi
+  if ! date -u +"updated:%Y-%m-%dT%H:%M:%SZ target:$TARGET_NVME_DEVICE" >"$DONE_MARKER"; then
+    log "Warning: failed to write UPDATE_DONE marker."
+  fi
+else
+  log "Warning: EFI partition is read-only; leaving updater entry enabled on USB media."
 fi
-date -u +"updated:%Y-%m-%dT%H:%M:%SZ target:$TARGET_NVME_DEVICE" >"$DONE_MARKER"
 sync
+if [ "$remounted_rw" -eq 1 ]; then
+  mount -o remount,ro "$UPDATER_EFI_MOUNT" || true
+fi
 if [ "$mounted_here" -eq 1 ]; then
   umount "$UPDATER_EFI_MOUNT" || true
 fi
