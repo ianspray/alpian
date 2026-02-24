@@ -85,6 +85,46 @@ Safety test without writing:
 sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
 ```
 
+## Script Index
+
+All scripts in `scripts/` and their primary purpose:
+
+- `scripts/check-tooling.sh`
+  - Verify required host build tools are installed.
+- `scripts/fetch-radxa-kernel.sh`
+  - Clone/update the Radxa kernel source tree used by kernel builds.
+- `scripts/build-kernel-e54c.sh`
+  - Build kernel image, modules, and DTBs for E54C.
+- `scripts/prepare-alpine-rootfs.sh`
+  - Build and configure Alpine rootfs content.
+- `scripts/assemble-e54c-image.sh`
+  - Assemble final main NVMe image from build artifacts.
+- `scripts/build-usb-updater-image.sh`
+  - Build USB updater image that reflashes NVMe and reboots.
+- `scripts/build-uboot-e54c-spi.sh`
+  - Build SPI U-Boot artifacts (including `spi-u-boot-16MiB.img`).
+- `scripts/build-apk-repo.sh`
+  - Build/sign local custom APK repository (Podman-based).
+- `scripts/serve-apk-repo.sh`
+  - Serve local custom APK repository over HTTP for testing.
+- `scripts/new-openrc-apk.sh`
+  - Scaffold a new OpenRC-service APK package.
+- `scripts/build-all-e54c.sh`
+  - Run the common full build pipeline in one command.
+- `scripts/write-image-to-nvme.sh`
+  - Safe writer for raw images to target block devices.
+
+Most common operating sequence:
+
+```bash
+scripts/check-tooling.sh
+scripts/build-apk-repo.sh
+scripts/build-kernel-e54c.sh
+scripts/prepare-alpine-rootfs.sh
+scripts/assemble-e54c-image.sh
+scripts/build-usb-updater-image.sh
+```
+
 ## Notes
 
 - U-Boot bootloader blobs are written at:
