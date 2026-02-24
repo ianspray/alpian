@@ -270,7 +270,15 @@ log "Verifying payload checksum..."
 (cd "$(dirname "$PAYLOAD_FILE")" && sha256sum -c "$(basename "$PAYLOAD_SHA256")")
 
 log "Flashing payload to $TARGET_NVME_DEVICE (this can take several minutes)..."
-zstd -dc "$PAYLOAD_FILE" | dd of="$TARGET_NVME_DEVICE" bs=8M iflag=fullblock conv=fsync status=progress
+dd_status_arg=""
+if dd --help 2>&1 | grep -q "status=progress"; then
+  dd_status_arg="status=progress"
+fi
+if [ -n "$dd_status_arg" ]; then
+  zstd -dc "$PAYLOAD_FILE" | dd of="$TARGET_NVME_DEVICE" bs=8M iflag=fullblock conv=fsync "$dd_status_arg"
+else
+  zstd -dc "$PAYLOAD_FILE" | dd of="$TARGET_NVME_DEVICE" bs=8M iflag=fullblock conv=fsync
+fi
 sync
 
 if command -v partprobe >/dev/null 2>&1; then
