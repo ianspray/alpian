@@ -19,6 +19,7 @@ USB_IMAGE_SIZE="${USB_IMAGE_SIZE:-}"
 UPDATER_GUESTFS_TMPDIR="${UPDATER_GUESTFS_TMPDIR:-$UPDATER_WORK_DIR/guestfs-tmp}"
 UPDATER_TARGET_NVME_DEVICE="${UPDATER_TARGET_NVME_DEVICE:-/dev/nvme0n1}"
 UPDATER_ROOT_PARTLABEL="${UPDATER_ROOT_PARTLABEL:-updater-rootfs}"
+UPDATER_INITRAMFS_NAME="${UPDATER_INITRAMFS_NAME:-${INITRAMFS_NAME:-initramfs-e54c.cpio.gz}}"
 UPDATER_ALPINE_PACKAGES="${UPDATER_ALPINE_PACKAGES:-alpine-base alpine-conf openssh mtd-utils dosfstools e2fsprogs zstd}"
 
 require_cmd() {
@@ -58,6 +59,10 @@ ENABLE_BOOT_NET_BANNER=1 \
 BOOT_BANNER_TITLE="E54C USB updater image" \
 MOTD_TEMPLATE_FILE="$REPO_ROOT/assets/reference/alpine/motd-updater" \
 "$SCRIPT_DIR/prepare-alpine-rootfs.sh"
+
+# Updater image must be able to persistently edit its own boot entries.
+# Keep root writable fallback if overlaytmpfs is not active.
+rm -f "$UPDATER_ROOTFS_DIR/etc/runlevels/boot/e54c-root-mode"
 
 mkdir -p "$UPDATER_PAYLOAD_DIR"
 
@@ -254,6 +259,7 @@ DISABLED_EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf.disabled"
 DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
 ROOT_EXTLINUX_PRIMARY="/boot/extlinux/extlinux.conf"
 ROOT_EXTLINUX_ALT="/extlinux/extlinux.conf"
+ROOTFS_RW_MOUNT="/run/e54c-updater-rootfs"
 mounted_here=0
 remounted_rw=0
 efi_state_persist=1
@@ -283,13 +289,31 @@ DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
 
 disable_root_extlinux() {
   local f=""
+  local rel=""
+  local src=""
+
+  if [ ! -f "$ROOT_EXTLINUX_PRIMARY" ] && [ ! -f "$ROOT_EXTLINUX_ALT" ]; then
+    return 0
+  fi
+
+  mkdir -p "$ROOTFS_RW_MOUNT"
+  if ! mount -o rw "$root_dev" "$ROOTFS_RW_MOUNT" 2>/dev/null; then
+    log "Warning: failed to mount updater rootfs read-write: $root_dev"
+    return 0
+  fi
+
   for f in "$ROOT_EXTLINUX_PRIMARY" "$ROOT_EXTLINUX_ALT"; do
-    if [ -f "$f" ]; then
-      if ! mv "$f" "${f}.disabled"; then
-        log "Warning: failed to disable USB rootfs boot entry: $f"
+    rel="${f#/}"
+    src="$ROOTFS_RW_MOUNT/$rel"
+    if [ -f "$src" ]; then
+      if ! mv "$src" "${src}.disabled"; then
+        log "Warning: failed to disable USB rootfs boot entry on device: $f"
       fi
     fi
   done
+
+  sync
+  umount "$ROOTFS_RW_MOUNT" || true
 }
 
 if [ -f "$DONE_MARKER" ]; then
@@ -411,9 +435,10 @@ IMAGE_SIZE="$USB_IMAGE_SIZE" \
 ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \
 ROOTFS_PARTLABEL="$UPDATER_ROOT_PARTLABEL" \
 ROOTFS_MKFS_LABEL="$UPDATER_ROOT_PARTLABEL" \
+INITRAMFS_NAME="$UPDATER_INITRAMFS_NAME" \
 DEFAULT_BOOT_MODE=maintenance \
-KERNEL_CMDLINE_MAINTENANCE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait rw console=ttyFIQ0,1500000n8 earlycon" \
-KERNEL_CMDLINE_IMMUTABLE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait rw console=ttyFIQ0,1500000n8 earlycon" \
+KERNEL_CMDLINE_MAINTENANCE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon" \
+KERNEL_CMDLINE_IMMUTABLE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon" \
 "$SCRIPT_DIR/assemble-e54c-image.sh"
 
 tmp_extlinux="$(mktemp)"
@@ -427,8 +452,9 @@ TIMEOUT 10
 LABEL updater
   MENU LABEL Alpine Linux USB updater (flash NVMe and reboot)
   LINUX /boot/Image
+  INITRD /boot/${UPDATER_INITRAMFS_NAME}
   FDT /boot/dtbs/rockchip/rk3588s-radxa-e54c-spi.dtb
-  APPEND root=PARTLABEL=${UPDATER_ROOT_PARTLABEL} rootfstype=ext4 rootwait rw console=ttyFIQ0,1500000n8 earlycon
+  APPEND root=PARTLABEL=${UPDATER_ROOT_PARTLABEL} rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon
 EOF
 
 guestfish <<EOF
@@ -436,6 +462,9 @@ add-drive $USB_UPDATER_IMAGE_PATH
 run
 mount /dev/sda2 /
 upload $tmp_extlinux /extlinux/extlinux.conf
+umount /
+mount /dev/sda3 /
+rm-f /boot/extlinux/extlinux.conf
 EOF
 
 echo "USB updater image complete: $USB_UPDATER_IMAGE_PATH"

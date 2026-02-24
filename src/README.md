@@ -81,7 +81,7 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `p3` `rootfs` ext4 uses remainder
 - USB updater image details:
   - Includes compressed payload derived from `build/e54c-alpine-custom.img`
-  - Boots a maintenance-style updater profile from USB
+  - Boots a true diskless updater profile from USB (`diskless=yes` via initramfs)
   - Auto-runs `e54c-usb-nvme-update` service to flash `/dev/nvme0n1`
   - Disables USB boot entries on both EFI (`/extlinux/extlinux.conf`) and rootfs (`/boot/extlinux/extlinux.conf`) after successful flash
   - Reboots so U-Boot can fall through to NVMe on next boot
@@ -90,11 +90,12 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `openrc` enabled for boot + networking + sshd
   - Non-blocking one-shot NTP sync is triggered at boot after networking (`e54c-ntp-sync`)
   - Default boot DTB is `rk3588s-radxa-e54c-spi.dtb`
-  - Immutable runtime mode by default: kernel cmdline uses `overlaytmpfs=yes` and read-only lower root
-  - If overlay root is not active, boot service `e54c-root-mode` remounts `/` read-only for immutable boots
-  - Maintenance boot mode available in extlinux menu with writable rootfs (`rw`, no overlay)
+  - Initramfs (`/boot/initramfs-e54c.cpio.gz`) is generated during image assembly
+  - Main image boots a single diskless profile by default (U-Boot option 1 only)
+  - Initramfs mounts source root partition read-only, populates tmpfs root, then `switch_root`s into RAM root
+  - `mdev` service is not enabled; device discovery is via kernel + `devtmpfs`
+  - Template service `e54c-dev-perms` applies optional custom `/dev` permissions at boot from `/etc/conf.d/e54c-dev-perms`
   - One-shot mode switch helper available on target: `/usr/local/sbin/e54c-boot-mode`
-  - One-shot reboot workflow auto-restores default boot label to immutable after maintenance boot
   - E54C network defaults: DHCP client on `wan`; `lan1`/`lan2`/`lan3` set to `manual`
   - E54C DSA/Realtek modules are force-loaded via `/etc/modules` at boot
   - Boot-time console/login banner prints currently assigned global IP addresses
@@ -128,38 +129,22 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
 - Override MOTD template used during image build:
   - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-main scripts/prepare-alpine-rootfs.sh`
   - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-updater scripts/prepare-alpine-rootfs.sh`
-- Change default boot mode in generated extlinux config:
-  - `DEFAULT_BOOT_MODE=maintenance scripts/assemble-e54c-image.sh`
 - Override default DTB used by extlinux and `/boot/efi/boot/dtbs/rockchip`:
   - `BOARD_DTB_NAME=rk3588s-radxa-e54c.dtb scripts/assemble-e54c-image.sh`
-- Override immutable/maintenance cmdlines:
-  - `KERNEL_CMDLINE_IMMUTABLE='root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon ro overlaytmpfs=yes' scripts/assemble-e54c-image.sh`
-  - `KERNEL_CMDLINE_MAINTENANCE='root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon rw' scripts/assemble-e54c-image.sh`
+- Override diskless cmdline:
+  - `KERNEL_CMDLINE_IMMUTABLE='root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon ro diskless=yes' scripts/assemble-e54c-image.sh`
+- Disable initramfs boot path (falls back to direct kernel root mount):
+  - `ENABLE_INITRAMFS_BOOT=0 scripts/assemble-e54c-image.sh`
+- Override generated initramfs filename:
+  - `INITRAMFS_NAME=initramfs-e54c.cpio.gz scripts/assemble-e54c-image.sh`
+- Customize fixed peripheral permissions (on target):
+  - edit `/etc/conf.d/e54c-dev-perms` and add rules like:
+  - `/dev/ttyUSB* root:dialout 0660`
 
-## On-Device Boot Mode Switching
+## On-Device Boot Mode
 
-Run on the E54C target as root:
-
-```bash
-e54c-boot-mode status
-e54c-boot-mode reboot-maintenance
-e54c-boot-mode reboot-immutable
-```
-
-Additional controls:
-
-```bash
-e54c-boot-mode next-maintenance
-e54c-boot-mode cancel-next
-e54c-boot-mode set-default immutable
-e54c-boot-mode set-default maintenance
-```
-
-Notes:
-
-- Standard `reboot`/`shutdown` do not natively select an extlinux boot label.
-- Use `e54c-boot-mode reboot-maintenance` for a one-shot maintenance boot without serial-console interaction.
-- After that maintenance boot, the next reboot returns to immutable by default.
+- Main image now uses a single diskless boot label (`immutable`).
+- Standard `reboot`/`shutdown` will always return to that diskless profile.
 
 ## USB-First Update Flow
 

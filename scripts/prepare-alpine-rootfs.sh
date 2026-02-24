@@ -218,12 +218,81 @@ enable_service() {
   ln -snf "/etc/init.d/$service" "$ROOTFS_DIR/etc/runlevels/$level/$service"
 }
 
-for svc in devfs dmesg mdev procfs sysfs; do
+# Template service for fixed USB/peripheral permissions in devtmpfs-only setups.
+cat >"$ROOTFS_DIR/etc/conf.d/e54c-dev-perms" <<'EOF'
+# Wait this many seconds before applying permissions (gives drivers time to create nodes).
+wait_seconds=3
+
+# Rule format:
+#   <glob> <owner:group> <mode>
+#
+# Examples:
+# /dev/ttyUSB* root:dialout 0660
+# /dev/video* root:video 0660
+# /dev/hidraw* root:root 0660
+EOF
+
+mkdir -p "$ROOTFS_DIR/usr/local/sbin"
+cat >"$ROOTFS_DIR/usr/local/sbin/e54c-apply-dev-perms" <<'EOF'
+#!/bin/sh
+set -eu
+
+CONF_FILE="/etc/conf.d/e54c-dev-perms"
+[ -f "$CONF_FILE" ] || exit 0
+
+wait_seconds="$(awk -F= '/^[[:space:]]*wait_seconds[[:space:]]*=/{gsub(/[[:space:]]|"/,"",$2); print $2; exit}' "$CONF_FILE" 2>/dev/null || true)"
+case "${wait_seconds:-}" in
+  ''|*[!0-9]*) wait_seconds=3 ;;
+esac
+[ "$wait_seconds" -gt 0 ] && sleep "$wait_seconds"
+
+awk '
+  /^[[:space:]]*#/ {next}
+  /^[[:space:]]*$/ {next}
+  {
+    pattern=$1; owner=$2; mode=$3
+    if (pattern=="" || owner=="" || mode=="") next
+    print pattern, owner, mode
+  }
+' "$CONF_FILE" | while read -r pattern owner mode; do
+  matched=0
+  for node in $pattern; do
+    [ -e "$node" ] || continue
+    matched=1
+    chown "$owner" "$node" 2>/dev/null || true
+    chmod "$mode" "$node" 2>/dev/null || true
+  done
+  [ "$matched" -eq 1 ] || true
+done
+EOF
+chmod 0755 "$ROOTFS_DIR/usr/local/sbin/e54c-apply-dev-perms"
+
+cat >"$ROOTFS_DIR/etc/init.d/e54c-dev-perms" <<'EOF'
+#!/sbin/openrc-run
+
+name="e54c-dev-perms"
+description="Apply custom device-node permissions for fixed peripherals"
+
+depend() {
+  need modules
+  before networking
+}
+
+start() {
+  ebegin "Applying custom device permissions"
+  /usr/local/sbin/e54c-apply-dev-perms
+  eend 0
+}
+EOF
+chmod 0755 "$ROOTFS_DIR/etc/init.d/e54c-dev-perms"
+
+for svc in devfs dmesg procfs sysfs; do
   enable_service "$svc" sysinit
 done
 for svc in modules sysctl hostname bootmisc swclock localmount; do
   enable_service "$svc" boot
 done
+enable_service e54c-dev-perms boot
 for svc in networking sshd; do
   enable_service "$svc" default
 done
@@ -620,10 +689,21 @@ depend() {
 start() {
   ebegin "Applying root mount mode"
 
+  root_fs_type="$(awk '$2=="/"{print $3; exit}' /proc/mounts 2>/dev/null || true)"
+  if [ -z "$root_fs_type" ] && command -v findmnt >/dev/null 2>&1; then
+    root_fs_type="$(findmnt -n -o FSTYPE / 2>/dev/null || true)"
+  fi
+
   case " $(cat /proc/cmdline 2>/dev/null) " in
+    *" diskless=yes "*|*" diskless=1 "*)
+      if [ "$root_fs_type" = "tmpfs" ]; then
+        einfo "Diskless mode active with tmpfs root."
+      else
+        ewarn "diskless mode requested but root is '$root_fs_type'."
+      fi
+      ;;
     *" overlaytmpfs=yes "*)
-      root_fs="$(findmnt -n -o FSTYPE / 2>/dev/null || true)"
-      if [ "$root_fs" = "overlay" ]; then
+      if [ "$root_fs_type" = "overlay" ]; then
         einfo "Immutable mode active with overlay rootfs."
       else
         if mount -o remount,ro / 2>/dev/null; then
