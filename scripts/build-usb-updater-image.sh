@@ -245,11 +245,24 @@ log "Target NVMe device: $TARGET_NVME_DEVICE"
 EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
 DISABLED_EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf.disabled"
 DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
-mkdir -p "$UPDATER_EFI_MOUNT"
-mountpoint -q "$UPDATER_EFI_MOUNT" || mount "$efi_dev" "$UPDATER_EFI_MOUNT"
+mounted_here=0
+existing_mountpoint="$(awk -v dev="$efi_dev" '$1==dev{print $2; exit}' /proc/mounts 2>/dev/null || true)"
+if [ -n "$existing_mountpoint" ]; then
+  UPDATER_EFI_MOUNT="$existing_mountpoint"
+  log "Using existing EFI mountpoint: $UPDATER_EFI_MOUNT"
+else
+  mkdir -p "$UPDATER_EFI_MOUNT"
+  mount "$efi_dev" "$UPDATER_EFI_MOUNT"
+  mounted_here=1
+fi
+EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
+DISABLED_EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf.disabled"
+DONE_MARKER="$UPDATER_EFI_MOUNT/UPDATE_DONE"
 if [ -f "$DONE_MARKER" ]; then
   log "Update already completed on this USB media; skipping."
-  umount "$UPDATER_EFI_MOUNT" || true
+  if [ "$mounted_here" -eq 1 ]; then
+    umount "$UPDATER_EFI_MOUNT" || true
+  fi
   exit 0
 fi
 
@@ -274,7 +287,9 @@ if [ -f "$EXTLINUX_CONF" ]; then
 fi
 date -u +"updated:%Y-%m-%dT%H:%M:%SZ target:$TARGET_NVME_DEVICE" >"$DONE_MARKER"
 sync
-umount "$UPDATER_EFI_MOUNT" || true
+if [ "$mounted_here" -eq 1 ]; then
+  umount "$UPDATER_EFI_MOUNT" || true
+fi
 
 log "Update complete. Rebooting into NVMe image."
 sleep 2
