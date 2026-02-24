@@ -25,6 +25,7 @@ BOOT_BANNER_TITLE="${BOOT_BANNER_TITLE:-}"
 ENABLE_BOOT_NTP_SYNC="${ENABLE_BOOT_NTP_SYNC:-1}"
 BOOT_NTP_SERVERS="${BOOT_NTP_SERVERS:-pool.ntp.org time.cloudflare.com time.google.com}"
 E54C_FORCE_DSA_MODULES="${E54C_FORCE_DSA_MODULES:-1}"
+MOTD_TEMPLATE_FILE="${MOTD_TEMPLATE_FILE:-$REPO_ROOT/assets/reference/alpine/motd-main}"
 
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
@@ -122,6 +123,14 @@ printf '  - %s\n' "${package_args[@]}"
   --cache-dir "$APK_CACHE_DIR" \
   --no-scripts \
   add "${package_args[@]}"
+
+if [ -n "$MOTD_TEMPLATE_FILE" ]; then
+  if [ ! -f "$MOTD_TEMPLATE_FILE" ]; then
+    echo "MOTD template does not exist: $MOTD_TEMPLATE_FILE" >&2
+    exit 1
+  fi
+  install -m 0644 "$MOTD_TEMPLATE_FILE" "$ROOTFS_DIR/etc/motd"
+fi
 
 cat >"$ROOTFS_DIR/etc/fstab" <<'EOF'
 # Keep persistent partitions read-only during normal operation.

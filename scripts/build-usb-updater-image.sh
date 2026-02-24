@@ -56,6 +56,7 @@ ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \
 ALPINE_PACKAGES="$UPDATER_ALPINE_PACKAGES" \
 ENABLE_BOOT_NET_BANNER=1 \
 BOOT_BANNER_TITLE="E54C USB updater image" \
+MOTD_TEMPLATE_FILE="$REPO_ROOT/assets/reference/alpine/motd-updater" \
 "$SCRIPT_DIR/prepare-alpine-rootfs.sh"
 
 mkdir -p "$UPDATER_PAYLOAD_DIR"

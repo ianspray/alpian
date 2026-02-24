@@ -1,0 +1,7 @@
+E54C Alpine Main Image
+
+Role: production/runtime image
+Storage: NVMe root filesystem
+Mode: immutable by default (maintenance mode available via boot menu)
+
+This MOTD is managed by the image build in this repository.

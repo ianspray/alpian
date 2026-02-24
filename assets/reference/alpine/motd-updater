@@ -1,0 +1,6 @@
+E54C Alpine USB Updater Image
+
+Role: update media (not the normal runtime image)
+Action: flashes bundled NVMe image and reboots
+
+If this image is running unexpectedly, remove the USB updater media.

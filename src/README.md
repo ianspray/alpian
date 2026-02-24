@@ -124,6 +124,9 @@ sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --dry-run
   - `ROOT_PASSWORD_PLAIN='your-password' scripts/prepare-alpine-rootfs.sh`
 - Disable force-loading E54C DSA modules:
   - `E54C_FORCE_DSA_MODULES=0 scripts/prepare-alpine-rootfs.sh`
+- Override MOTD template used during image build:
+  - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-main scripts/prepare-alpine-rootfs.sh`
+  - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-updater scripts/prepare-alpine-rootfs.sh`
 - Change default boot mode in generated extlinux config:
   - `DEFAULT_BOOT_MODE=maintenance scripts/assemble-e54c-image.sh`
 - Override default DTB used by extlinux and `/boot/efi/boot/dtbs/rockchip`:
