@@ -70,7 +70,7 @@ TARGET_NVME_DEVICE="${TARGET_NVME_DEVICE:-/dev/nvme0n1}"
 ROOT_PARTLABEL_REQUIRED="${ROOT_PARTLABEL_REQUIRED:-updater-rootfs}"
 TARGET_WAIT_SECONDS="${TARGET_WAIT_SECONDS:-120}"
 UPDATER_EFI_MOUNT="/run/e54c-updater-efi"
-RUN_MARKER="/run/e54c-usb-update.attempted"
+LOCK_DIR="/run/e54c-usb-update.lock"
 
 log() {
   echo "[e54c-usb-updater] $*"
@@ -78,11 +78,14 @@ log() {
 
 log "E54C USB updater image active."
 
-if [ -f "$RUN_MARKER" ]; then
-  log "Updater already attempted this boot; skipping."
+if ! mkdir "$LOCK_DIR" 2>/dev/null; then
+  log "Updater is already running; skipping."
   exit 0
 fi
-touch "$RUN_MARKER"
+cleanup() {
+  rmdir "$LOCK_DIR" 2>/dev/null || true
+}
+trap cleanup EXIT INT TERM
 
 if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null; then
   log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED)."
