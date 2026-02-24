@@ -100,10 +100,44 @@ if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null
 fi
 
 resolve_root_device() {
-  local src=""
+  local src="" devname=""
+
+  find_partlabel_devname() {
+    local want="$1" uevent=""
+    for uevent in /sys/class/block/*/uevent; do
+      [ -f "$uevent" ] || continue
+      if sed -n "s/^PARTNAME=//p" "$uevent" | grep -qx "$want"; then
+        basename "$(dirname "$uevent")"
+        return 0
+      fi
+    done
+    return 1
+  }
+
+  ensure_block_node() {
+    local name="$1" node="/dev/$1" devno="" major="" minor=""
+    if [ -b "$node" ]; then
+      printf '%s' "$node"
+      return 0
+    fi
+    devno="$(cat "/sys/class/block/$name/dev" 2>/dev/null || true)"
+    [ -n "$devno" ] || return 1
+    major="${devno%:*}"
+    minor="${devno#*:}"
+    [ -n "$major" ] && [ -n "$minor" ] || return 1
+    mknod "$node" b "$major" "$minor" 2>/dev/null || true
+    [ -b "$node" ] || return 1
+    printf '%s' "$node"
+    return 0
+  }
+
+  devname="$(find_partlabel_devname "$ROOT_PARTLABEL_REQUIRED" || true)"
+  if [ -n "$devname" ]; then
+    src="$(ensure_block_node "$devname" || true)"
+  fi
 
   if command -v findmnt >/dev/null 2>&1; then
-    src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
+    [ -n "$src" ] || src="$(findmnt -n -o SOURCE / 2>/dev/null || true)"
   fi
 
   if [ -z "$src" ]; then
@@ -126,24 +160,58 @@ resolve_root_device() {
   printf '%s' "$src"
 }
 
+derive_efi_device_from_root() {
+  local root_dev="$1" root_name="" efi_name="" parent=""
+
+  ensure_block_node() {
+    local name="$1" node="/dev/$1" devno="" major="" minor=""
+    if [ -b "$node" ]; then
+      printf '%s' "$node"
+      return 0
+    fi
+    devno="$(cat "/sys/class/block/$name/dev" 2>/dev/null || true)"
+    [ -n "$devno" ] || return 1
+    major="${devno%:*}"
+    minor="${devno#*:}"
+    [ -n "$major" ] && [ -n "$minor" ] || return 1
+    mknod "$node" b "$major" "$minor" 2>/dev/null || true
+    [ -b "$node" ] || return 1
+    printf '%s' "$node"
+    return 0
+  }
+
+  root_name="$(basename "$root_dev")"
+  case "$root_name" in
+    sd[a-z]3|vd[a-z]3|xvd[a-z]3)
+      efi_name="${root_name%3}2"
+      ;;
+    mmcblk*p3|nvme*n*p3)
+      efi_name="${root_name%p3}p2"
+      ;;
+  esac
+
+  if [ -z "$efi_name" ]; then
+    parent="$(basename "$(readlink -f "/sys/class/block/$root_name/.." 2>/dev/null || true)")"
+    if [ -n "$parent" ]; then
+      if [ -e "/sys/class/block/${parent}2" ]; then
+        efi_name="${parent}2"
+      elif [ -e "/sys/class/block/${parent}p2" ]; then
+        efi_name="${parent}p2"
+      fi
+    fi
+  fi
+
+  [ -n "$efi_name" ] || return 1
+  ensure_block_node "$efi_name"
+}
+
 root_dev="$(resolve_root_device)"
 if [ -z "$root_dev" ] || [ ! -b "$root_dev" ]; then
   log "Unable to determine root block device."
   exit 1
 fi
 
-case "$root_dev" in
-  /dev/sd[a-z]3|/dev/vd[a-z]3|/dev/xvd[a-z]3)
-    efi_dev="${root_dev%3}2"
-    ;;
-  /dev/mmcblk*p3|/dev/nvme*n*p3)
-    efi_dev="${root_dev%p3}p2"
-    ;;
-  *)
-    log "Unsupported root device layout: $root_dev"
-    exit 1
-    ;;
-esac
+efi_dev="$(derive_efi_device_from_root "$root_dev" || true)"
 
 if [ ! -b "$efi_dev" ]; then
   log "Updater EFI partition not found: $efi_dev"
