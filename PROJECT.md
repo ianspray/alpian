@@ -43,6 +43,11 @@ e that the change summary is in the body of the commit message
   - After updating, the USB Updater should make itself non-bootable as far as u-boot is concerned
   - It should then reboot the system, which will then skip the USB drive and contonue on to boot into NVMe
 - The E54C SPI u-boot image may need to be updated to enable USB booting
+- All code generated for this project is under the MIT licence
+  - Each file that is generated that supports comments, must indicate the licence via SPDX
+  - The SPDX header line `SPDX-License-Identifier: MIT` should be used
+  - For shell scripts, do not break the `#!` first line declaration with SPDX
+  - For files that are downloaded, do not claim or modify any licence information
 
 ## Guides
 - Radxa documentation about the E54C: https://docs.radxa.com/en/e/e54c
