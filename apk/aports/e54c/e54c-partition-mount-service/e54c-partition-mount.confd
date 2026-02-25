@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # What is the hardware we want to examine ?
 check_hardware_path="/dev/nvme0n1"
 

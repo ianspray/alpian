@@ -1,4 +1,5 @@
 #!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
 
 name="show-net-addrs"
 description="Show network addresses on console and login banner"

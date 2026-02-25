@@ -1,4 +1,5 @@
 #!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
 
 name="e54c-dev-perms"
 description="Apply custom device-node permissions for fixed peripherals"

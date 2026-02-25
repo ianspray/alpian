@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
 set -eu
 
 PAYLOAD_FILE="/opt/e54c-updater/nvme-image.img.zst"

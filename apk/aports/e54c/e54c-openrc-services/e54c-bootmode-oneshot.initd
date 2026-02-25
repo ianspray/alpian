@@ -1,4 +1,5 @@
 #!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
 
 name="e54c-bootmode-oneshot"
 description="Apply one-shot maintenance boot mode and restore immutable default"

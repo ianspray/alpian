@@ -1,4 +1,5 @@
 #!/bin/sh
+# SPDX-License-Identifier: MIT
 set -eu
 
 CONF_FILE="/etc/conf.d/e54c-partition-mount"

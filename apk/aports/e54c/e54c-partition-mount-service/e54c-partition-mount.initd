@@ -1,4 +1,5 @@
 #!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
 
 name="e54c-partition-mount"
 description="Check a hardware device for partitions with labels, and mount them"

@@ -1,4 +1,5 @@
 #!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
 
 name="e54c-ntp-sync"
 description="Run one-shot NTP sync in background"

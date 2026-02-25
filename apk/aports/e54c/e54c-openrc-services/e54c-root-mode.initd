@@ -1,4 +1,5 @@
 #!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
 
 name="e54c-root-mode"
 description="Apply immutable/maintenance root mount mode"

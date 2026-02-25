@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Maintainer: IWS <iws@toothless.local>
 pkgname=e54c-openrc-services
 pkgver=0.1.0

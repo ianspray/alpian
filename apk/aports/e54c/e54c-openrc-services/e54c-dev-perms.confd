@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: MIT
 # Wait this many seconds before applying permissions (gives drivers time to create nodes).
 wait_seconds=3
 
