@@ -27,10 +27,12 @@ ROOTFS_MKFS_LABEL="${ROOTFS_MKFS_LABEL:-$ROOTFS_PARTLABEL}"
 ENABLE_INITRAMFS_BOOT="${ENABLE_INITRAMFS_BOOT:-1}"
 INITRAMFS_NAME="${INITRAMFS_NAME:-initramfs-e54c.cpio.gz}"
 SINGLE_BOOT_LABEL="${SINGLE_BOOT_LABEL:-immutable}"
+CONFIG_PART_GPT_TYPE="${CONFIG_PART_GPT_TYPE:-0FC63DAF-8483-4772-8E79-3D69D8477DE4}"
+BOOTCFG_PART_GPT_TYPE="${BOOTCFG_PART_GPT_TYPE:-C12A7328-F81F-11D2-BA4B-00A0C93EC93B}"
 
 # Partition geometry (512-byte sectors):
 # - p1 config: 256 MiB (starts at 16 MiB)
-# - p2 efi:    300 MiB
+# - p2 bootcfg: 300 MiB
 # - p3 rootfs: remainder
 P1_START=32768
 P1_SIZE_SECTORS=$((256 * 1024 * 1024 / 512))
@@ -350,8 +352,8 @@ part-add /dev/sda p $P3_START -34
 part-set-name /dev/sda 1 config
 part-set-name /dev/sda 2 efi
 part-set-name /dev/sda 3 $ROOTFS_PARTLABEL
-part-set-gpt-type /dev/sda 1 0FC63DAF-8483-4772-8E79-3D69D8477DE4
-part-set-gpt-type /dev/sda 2 C12A7328-F81F-11D2-BA4B-00A0C93EC93B
+part-set-gpt-type /dev/sda 1 $CONFIG_PART_GPT_TYPE
+part-set-gpt-type /dev/sda 2 $BOOTCFG_PART_GPT_TYPE
 part-set-gpt-type /dev/sda 3 0FC63DAF-8483-4772-8E79-3D69D8477DE4
 mkfs vfat /dev/sda1 label:config
 mkfs vfat /dev/sda2 label:efi

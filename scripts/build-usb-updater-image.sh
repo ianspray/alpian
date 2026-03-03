@@ -110,6 +110,7 @@ ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \
 ROOTFS_PARTLABEL="$UPDATER_ROOT_PARTLABEL" \
 ROOTFS_MKFS_LABEL="$UPDATER_ROOT_PARTLABEL" \
 INITRAMFS_NAME="$UPDATER_INITRAMFS_NAME" \
+BOOTCFG_PART_GPT_TYPE="EBD0A0A2-B9E5-4433-87C0-68B6B72699C7" \
 DEFAULT_BOOT_MODE=maintenance \
 KERNEL_CMDLINE_MAINTENANCE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off" \
 KERNEL_CMDLINE_IMMUTABLE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off" \

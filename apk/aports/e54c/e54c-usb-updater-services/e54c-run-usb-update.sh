@@ -96,49 +96,92 @@ resolve_root_device() {
   printf '%s' "$src"
 }
 
-derive_efi_device_from_root() {
-  local root_dev="$1" root_name="" efi_name="" parent=""
-
-  ensure_block_node() {
-    local name="$1" node="/dev/$1" devno="" major="" minor=""
-    if [ -b "$node" ]; then
-      printf '%s' "$node"
-      return 0
-    fi
-    devno="$(cat "/sys/class/block/$name/dev" 2>/dev/null || true)"
-    [ -n "$devno" ] || return 1
-    major="${devno%:*}"
-    minor="${devno#*:}"
-    [ -n "$major" ] && [ -n "$minor" ] || return 1
-    mknod "$node" b "$major" "$minor" 2>/dev/null || true
-    [ -b "$node" ] || return 1
+ensure_block_node_by_name() {
+  local name="$1" node="/dev/$1" devno="" major="" minor=""
+  if [ -b "$node" ]; then
     printf '%s' "$node"
     return 0
-  }
+  fi
+  devno="$(cat "/sys/class/block/$name/dev" 2>/dev/null || true)"
+  [ -n "$devno" ] || return 1
+  major="${devno%:*}"
+  minor="${devno#*:}"
+  [ -n "$major" ] && [ -n "$minor" ] || return 1
+  mknod "$node" b "$major" "$minor" 2>/dev/null || true
+  [ -b "$node" ] || return 1
+  printf '%s' "$node"
+}
 
+derive_partition_device_from_root() {
+  local root_dev="$1" partnum="$2" root_name="" base_name="" want_name=""
   root_name="$(basename "$root_dev")"
+
   case "$root_name" in
-    sd[a-z]3|vd[a-z]3|xvd[a-z]3)
-      efi_name="${root_name%3}2"
+    mmcblk*p[0-9]*|nvme*n*p[0-9]*)
+      base_name="${root_name%p*}"
+      want_name="${base_name}p${partnum}"
       ;;
-    mmcblk*p3|nvme*n*p3)
-      efi_name="${root_name%p3}p2"
+    sd[a-z][0-9]*|vd[a-z][0-9]*|xvd[a-z][0-9]*)
+      base_name="$(printf '%s' "$root_name" | sed 's/[0-9][0-9]*$//')"
+      want_name="${base_name}${partnum}"
+      ;;
+    *)
+      return 1
       ;;
   esac
 
-  if [ -z "$efi_name" ]; then
-    parent="$(basename "$(readlink -f "/sys/class/block/$root_name/.." 2>/dev/null || true)")"
-    if [ -n "$parent" ]; then
-      if [ -e "/sys/class/block/${parent}2" ]; then
-        efi_name="${parent}2"
-      elif [ -e "/sys/class/block/${parent}p2" ]; then
-        efi_name="${parent}p2"
-      fi
+  ensure_block_node_by_name "$want_name"
+}
+
+partition_has_updater_bootcfg() {
+  local dev="$1" mountpoint="" probe_mnt="" has_state=1
+  [ -b "$dev" ] || return 1
+
+  mountpoint="$(awk -v d="$dev" '$1==d{print $2; exit}' /proc/mounts 2>/dev/null || true)"
+  if [ -n "$mountpoint" ]; then
+    if [ -f "$mountpoint/extlinux/extlinux.conf" ] || [ -f "$mountpoint/extlinux/extlinux.conf.disabled" ] || [ -f "$mountpoint/UPDATE_DONE" ]; then
+      return 0
     fi
+    return 1
   fi
 
-  [ -n "$efi_name" ] || return 1
-  ensure_block_node "$efi_name"
+  probe_mnt="/run/e54c-updater-probe.$$"
+  mkdir -p "$probe_mnt"
+  if mount -o ro "$dev" "$probe_mnt" 2>/dev/null; then
+    if [ -f "$probe_mnt/extlinux/extlinux.conf" ] || [ -f "$probe_mnt/extlinux/extlinux.conf.disabled" ] || [ -f "$probe_mnt/UPDATE_DONE" ]; then
+      has_state=0
+    fi
+    umount "$probe_mnt" || true
+  fi
+  rmdir "$probe_mnt" 2>/dev/null || true
+  return "$has_state"
+}
+
+derive_bootcfg_device_from_root() {
+  local root_dev="$1" p2_dev="" p1_dev=""
+
+  p2_dev="$(derive_partition_device_from_root "$root_dev" 2 || true)"
+  p1_dev="$(derive_partition_device_from_root "$root_dev" 1 || true)"
+
+  if [ -n "$p2_dev" ] && partition_has_updater_bootcfg "$p2_dev"; then
+    printf '%s' "$p2_dev"
+    return 0
+  fi
+  if [ -n "$p1_dev" ] && partition_has_updater_bootcfg "$p1_dev"; then
+    printf '%s' "$p1_dev"
+    return 0
+  fi
+
+  if [ -b "$p2_dev" ]; then
+    printf '%s' "$p2_dev"
+    return 0
+  fi
+  if [ -b "$p1_dev" ]; then
+    printf '%s' "$p1_dev"
+    return 0
+  fi
+
+  return 1
 }
 
 root_dev="$(resolve_root_device)"
@@ -147,10 +190,10 @@ if [ -z "$root_dev" ] || [ ! -b "$root_dev" ]; then
   exit 1
 fi
 
-efi_dev="$(derive_efi_device_from_root "$root_dev" || true)"
+efi_dev="$(derive_bootcfg_device_from_root "$root_dev" || true)"
 
 if [ ! -b "$efi_dev" ]; then
-  log "Updater EFI partition not found: $efi_dev"
+  log "Updater bootcfg partition not found: $efi_dev"
   exit 1
 fi
 
@@ -175,7 +218,7 @@ if [ ! -b "$TARGET_NVME_DEVICE" ]; then
 fi
 
 log "Root device: $root_dev"
-log "Updater EFI partition: $efi_dev"
+log "Updater bootcfg partition: $efi_dev"
 log "Target NVMe device: $TARGET_NVME_DEVICE"
 
 EXTLINUX_CONF="$UPDATER_EFI_MOUNT/extlinux/extlinux.conf"
@@ -186,19 +229,19 @@ ROOT_EXTLINUX_ALT="/extlinux/extlinux.conf"
 ROOTFS_RW_MOUNT="/run/e54c-updater-rootfs"
 mounted_here=0
 remounted_rw=0
-efi_state_persist=1
+bootcfg_state_persist=1
 existing_mountpoint="$(awk -v dev="$efi_dev" '$1==dev{print $2; exit}' /proc/mounts 2>/dev/null || true)"
 if [ -n "$existing_mountpoint" ]; then
   existing_mountopts="$(awk -v dev="$efi_dev" '$1==dev{print $4; exit}' /proc/mounts 2>/dev/null || true)"
   UPDATER_EFI_MOUNT="$existing_mountpoint"
-  log "Using existing EFI mountpoint: $UPDATER_EFI_MOUNT"
+  log "Using existing bootcfg mountpoint: $UPDATER_EFI_MOUNT"
   case ",$existing_mountopts," in
     *,ro,*)
       if mount -o remount,rw "$UPDATER_EFI_MOUNT"; then
         remounted_rw=1
       else
-        log "Warning: cannot remount EFI partition read-write; updater boot entry will not be disabled."
-        efi_state_persist=0
+        log "Warning: cannot remount updater bootcfg partition read-write; updater boot entry will not be disabled."
+        bootcfg_state_persist=0
       fi
       ;;
   esac
@@ -243,8 +286,8 @@ disable_root_extlinux() {
 if [ -f "$DONE_MARKER" ]; then
   log "Update already completed on this USB media; skipping."
   disable_root_extlinux
-  if [ "$efi_state_persist" -eq 1 ] && [ -f "$EXTLINUX_CONF" ]; then
-    mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF" || log "Warning: failed to disable updater EFI extlinux entry."
+  if [ "$bootcfg_state_persist" -eq 1 ] && [ -f "$EXTLINUX_CONF" ]; then
+    mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF" || log "Warning: failed to disable updater bootcfg extlinux entry."
   fi
   if [ "$mounted_here" -eq 1 ]; then
     umount "$UPDATER_EFI_MOUNT" || true
@@ -288,7 +331,7 @@ fi
 
 log "Disabling USB updater boot entries so next boot falls through to NVMe..."
 disable_root_extlinux
-if [ "$efi_state_persist" -eq 1 ]; then
+if [ "$bootcfg_state_persist" -eq 1 ]; then
   if [ -f "$EXTLINUX_CONF" ]; then
     if ! mv "$EXTLINUX_CONF" "$DISABLED_EXTLINUX_CONF"; then
       log "Warning: failed to disable updater extlinux entry."
@@ -298,7 +341,7 @@ if [ "$efi_state_persist" -eq 1 ]; then
     log "Warning: failed to write UPDATE_DONE marker."
   fi
 else
-  log "Warning: EFI partition is read-only; leaving updater entry enabled on USB media."
+  log "Warning: updater bootcfg partition is read-only; leaving updater entry enabled on USB media."
 fi
 sync
 if [ "$remounted_rw" -eq 1 ]; then
