@@ -28,4 +28,14 @@ if [ "${#missing[@]}" -gt 0 ]; then
   exit 1
 fi
 
+# Validate OpenSSL development headers required by kernel/U-Boot host tools.
+if ! printf '%s\n' '#include <openssl/bio.h>' 'int main(void) { return 0; }' \
+  | gcc -x c - -c -o /dev/null >/dev/null 2>&1; then
+  echo "Missing OpenSSL development headers (openssl/bio.h)."
+  echo "Install the development package for your distro, e.g.:"
+  echo "  Debian/Ubuntu: libssl-dev"
+  echo "  Alpine: openssl-dev"
+  exit 1
+fi
+
 echo "All required tooling is available."

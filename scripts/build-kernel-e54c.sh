@@ -7,9 +7,8 @@ export PATH="$PATH:/usr/sbin:/sbin"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-"$SCRIPT_DIR/check-tooling.sh"
-"$SCRIPT_DIR/fetch-radxa-kernel.sh"
-
+KERNEL_DIR_WAS_SET="${KERNEL_DIR+x}"
+OUT_DIR_WAS_SET="${OUT_DIR+x}"
 KERNEL_DIR="${KERNEL_DIR:-$REPO_ROOT/src/radxa-kernel-e54c}"
 OUT_DIR="${OUT_DIR:-$REPO_ROOT/build/kernel-out}"
 ARTIFACTS_DIR="${ARTIFACTS_DIR:-$REPO_ROOT/build/kernel-artifacts}"
@@ -19,6 +18,39 @@ JOBS="${JOBS:-}"
 DEFCONFIG_TARGET="${DEFCONFIG_TARGET:-rockchip_linux_defconfig}"
 FRAGMENT_FILE="${FRAGMENT_FILE:-$REPO_ROOT/assets/reference/radxa/custom-kernel.fragment}"
 BUILD_TARGETS="${BUILD_TARGETS:-Image dtbs modules}"
+CASE_INSENSITIVE_WORKSPACE=0
+
+is_case_insensitive_dir() {
+  local dir="$1" probe_base lower upper
+  probe_base=".case-probe-$$-$RANDOM"
+  lower="$dir/${probe_base}a"
+  upper="$dir/${probe_base}A"
+  : >"$lower"
+  if [ -e "$upper" ]; then
+    rm -f "$lower" "$upper"
+    return 0
+  fi
+  rm -f "$lower" "$upper"
+  return 1
+}
+
+if is_case_insensitive_dir "$REPO_ROOT"; then
+  CASE_INSENSITIVE_WORKSPACE=1
+  echo "Detected case-insensitive workspace filesystem."
+  if [ -z "$KERNEL_DIR_WAS_SET" ]; then
+    KERNEL_DIR="/tmp/radxa-kernel-e54c"
+    echo "Using case-sensitive kernel checkout: $KERNEL_DIR"
+  fi
+  if [ -z "$OUT_DIR_WAS_SET" ]; then
+    OUT_DIR="/tmp/e54c-kernel-out"
+    echo "Using case-sensitive kernel output dir: $OUT_DIR"
+  fi
+fi
+
+export KERNEL_DIR
+
+"$SCRIPT_DIR/check-tooling.sh"
+"$SCRIPT_DIR/fetch-radxa-kernel.sh"
 
 detect_jobs() {
   local cpu_jobs mem_kb mem_limit jobs_by_mem
@@ -127,8 +159,17 @@ for dtb in rk3588s-radxa-e54c.dtb rk3588s-radxa-e54c-spi.dtb; do
 done
 
 if [[ " $BUILD_TARGETS " == *" modules "* ]]; then
-  make "${MAKE_ARGS[@]}" \
-    modules_install INSTALL_MOD_PATH="$RELEASE_DIR/rootfs"
+  if [ "$CASE_INSENSITIVE_WORKSPACE" -eq 1 ]; then
+    modules_stage="$(mktemp -d)"
+    make "${MAKE_ARGS[@]}" \
+      modules_install INSTALL_MOD_PATH="$modules_stage"
+    tar -C "$modules_stage" -cf "$RELEASE_DIR/modules-rootfs.tar" lib/modules
+    rm -rf "$modules_stage" "$RELEASE_DIR/rootfs"
+    echo "Stored modules in $RELEASE_DIR/modules-rootfs.tar for case-insensitive workspace compatibility."
+  else
+    make "${MAKE_ARGS[@]}" \
+      modules_install INSTALL_MOD_PATH="$RELEASE_DIR/rootfs"
+  fi
 fi
 
 echo "Kernel build complete."

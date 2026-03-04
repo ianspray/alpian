@@ -35,6 +35,7 @@ MOTD_TEMPLATE_FILE="${MOTD_TEMPLATE_FILE:-$REPO_ROOT/assets/reference/alpine/mot
 ENFORCE_IMMUTABLE_ROOT="${ENFORCE_IMMUTABLE_ROOT:-1}"
 
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
+ROOTFS_DIR_WAS_SET="${ROOTFS_DIR+x}"
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
 ROOTFS_TAR="${ROOTFS_TAR:-$REPO_ROOT/build/alpine-rootfs.tar}"
 DEFAULT_ROOT_AUTHORIZED_KEYS_FILE="$REPO_ROOT/assets/reference/alpine/root_authorized_keys"
@@ -74,9 +75,25 @@ if [ ! -f "$MINIROOTFS_PATH" ]; then
   curl -fL "$MINIROOTFS_URL" -o "$MINIROOTFS_PATH"
 fi
 
-rm -rf "$ROOTFS_DIR"
-mkdir -p "$ROOTFS_DIR"
-tar -xzf "$MINIROOTFS_PATH" -C "$ROOTFS_DIR"
+extract_minirootfs() {
+  local target_dir="$1"
+  rm -rf "$target_dir"
+  mkdir -p "$target_dir"
+  tar -xzf "$MINIROOTFS_PATH" -C "$target_dir"
+}
+
+if ! extract_minirootfs "$ROOTFS_DIR"; then
+  if [ -z "$ROOTFS_DIR_WAS_SET" ]; then
+    fallback_rootfs_dir="/tmp/e54c-alpine-rootfs"
+    echo "Rootfs extraction failed in workspace path: $ROOTFS_DIR" >&2
+    echo "Retrying in container-local path: $fallback_rootfs_dir" >&2
+    ROOTFS_DIR="$fallback_rootfs_dir"
+    extract_minirootfs "$ROOTFS_DIR"
+  else
+    echo "Rootfs extraction failed for ROOTFS_DIR=$ROOTFS_DIR" >&2
+    exit 1
+  fi
+fi
 
 repo_lines=(
   "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main"

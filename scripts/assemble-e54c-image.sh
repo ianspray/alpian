@@ -338,6 +338,8 @@ tar -C "$tmp_stage" -cf "$BOOT_TAR" boot
 
 if [ -d "$KERNEL_RELEASE_DIR/rootfs/lib/modules" ]; then
   tar -C "$KERNEL_RELEASE_DIR/rootfs" -cf "$MODULES_TAR" lib/modules
+elif [ -f "$KERNEL_RELEASE_DIR/modules-rootfs.tar" ]; then
+  cp "$KERNEL_RELEASE_DIR/modules-rootfs.tar" "$MODULES_TAR"
 else
   tar -cf "$MODULES_TAR" --files-from /dev/null
 fi

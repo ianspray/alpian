@@ -12,6 +12,9 @@ APK_REPO_OUT="${APK_REPO_OUT:-$REPO_ROOT/build/apk-repo}"
 APK_KEYS_DIR="${APK_KEYS_DIR:-$REPO_ROOT/build/apk-keys}"
 APK_KEYS_EXPORT_DIR="${APK_KEYS_EXPORT_DIR:-$REPO_ROOT/assets/reference/alpine/custom-keys}"
 APK_PODMAN_IMAGE="${APK_PODMAN_IMAGE:-docker.io/library/alpine:3.23}"
+APK_PODMAN_NETWORK="${APK_PODMAN_NETWORK:-host}"
+APK_RETRY_COUNT="${APK_RETRY_COUNT:-5}"
+APK_RETRY_DELAY_SEC="${APK_RETRY_DELAY_SEC:-3}"
 
 require_cmd() {
   local cmd="$1"
@@ -24,6 +27,24 @@ require_cmd() {
 require_cmd podman
 require_cmd find
 require_cmd sort
+
+retry_cmd() {
+  local tries="$1"
+  local delay="$2"
+  shift 2
+  local attempt=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+    if [ "$attempt" -ge "$tries" ]; then
+      return 1
+    fi
+    echo "Command failed (attempt ${attempt}/${tries}), retrying in ${delay}s: $*" >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+}
 
 if [ ! -d "$APK_APORTS_ROOT" ]; then
   echo "APK_APORTS_ROOT does not exist: $APK_APORTS_ROOT" >&2
@@ -49,8 +70,26 @@ mkdir -p "$repo_arch_dir"
 rm -f "$repo_arch_dir"/*.apk "$repo_arch_dir"/APKINDEX.tar.gz "$repo_arch_dir"/APKINDEX.tar.gz.sig
 
 CONTAINER_SCRIPT='set -euo pipefail
-apk update
-apk add alpine-sdk bash
+
+retry_apk() {
+  tries="${APK_RETRY_COUNT:-5}"
+  delay="${APK_RETRY_DELAY_SEC:-3}"
+  attempt=1
+  while true; do
+    if apk "$@"; then
+      return 0
+    fi
+    if [ "$attempt" -ge "$tries" ]; then
+      return 1
+    fi
+    echo "apk $* failed (attempt ${attempt}/${tries}), retrying in ${delay}s" >&2
+    sleep "$delay"
+    attempt=$((attempt + 1))
+  done
+}
+
+retry_apk update
+retry_apk add alpine-sdk bash
 
 if ! id builder >/dev/null 2>&1; then
   adduser -D builder
@@ -105,14 +144,18 @@ cp -f /home/builder/.abuild/*.rsa.pub /work/out/keys/
 cp -f /home/builder/.abuild/*.rsa.pub /work/keys/
 '
 
-podman run --rm \
-  -e APK_REPO_BRANCH="$APK_REPO_BRANCH" \
-  -e APK_ARCH="$APK_ARCH" \
-  -v "$APK_APORTS_ROOT:/work/aports:ro" \
-  -v "$APK_REPO_OUT:/work/out" \
-  -v "$APK_KEYS_DIR:/work/keys" \
-  "$APK_PODMAN_IMAGE" \
-  sh -c "$CONTAINER_SCRIPT"
+retry_cmd "$APK_RETRY_COUNT" "$APK_RETRY_DELAY_SEC" \
+  podman run --rm \
+    --network "$APK_PODMAN_NETWORK" \
+    -e APK_REPO_BRANCH="$APK_REPO_BRANCH" \
+    -e APK_ARCH="$APK_ARCH" \
+    -e APK_RETRY_COUNT="$APK_RETRY_COUNT" \
+    -e APK_RETRY_DELAY_SEC="$APK_RETRY_DELAY_SEC" \
+    -v "$APK_APORTS_ROOT:/work/aports:ro" \
+    -v "$APK_REPO_OUT:/work/out" \
+    -v "$APK_KEYS_DIR:/work/keys" \
+    "$APK_PODMAN_IMAGE" \
+    sh -c "$CONTAINER_SCRIPT"
 
 copied_keys=0
 while IFS= read -r pubkey; do

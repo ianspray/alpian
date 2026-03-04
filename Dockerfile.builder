@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   genisoimage \
   git \
   kpartx \
+  libssl-dev \
   libguestfs-tools \
   mtools \
   openssl \

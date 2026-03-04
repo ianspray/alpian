@@ -42,12 +42,27 @@ require_cmd() {
   fi
 }
 
+runtime_usable() {
+  local runtime="$1"
+  case "$runtime" in
+    docker)
+      docker info >/dev/null 2>&1
+      ;;
+    podman)
+      podman info >/dev/null 2>&1
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 auto_detect_runtime() {
-  if command -v docker >/dev/null 2>&1; then
+  if command -v docker >/dev/null 2>&1 && runtime_usable docker; then
     echo docker
     return
   fi
-  if command -v podman >/dev/null 2>&1; then
+  if command -v podman >/dev/null 2>&1 && runtime_usable podman; then
     echo podman
     return
   fi
@@ -112,6 +127,15 @@ if [ "$CONTAINER_RUNTIME" != "docker" ] && [ "$CONTAINER_RUNTIME" != "podman" ];
 fi
 
 require_cmd "$CONTAINER_RUNTIME"
+
+if ! runtime_usable "$CONTAINER_RUNTIME"; then
+  echo "Selected runtime '$CONTAINER_RUNTIME' is installed but not reachable." >&2
+  if [ "$CONTAINER_RUNTIME" = "docker" ]; then
+    echo "Tip: your docker CLI may point to a different socket/context (for example OrbStack)." >&2
+    echo "Try: ./scripts/run-build-in-container.sh --runtime podman" >&2
+  fi
+  exit 1
+fi
 
 if [ ! -f "$BUILDER_DOCKERFILE" ]; then
   echo "Builder Dockerfile does not exist: $BUILDER_DOCKERFILE" >&2
