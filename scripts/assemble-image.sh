@@ -31,6 +31,8 @@ UBOOT_DIR="${UBOOT_DIR:-${BOARD_UBOOT_ASSETS_DIR:-$REPO_ROOT/assets/reference/u-
 CONFIG_FILE="${CONFIG_FILE:-${BOARD_CONFIG_FILE_DEFAULT:-$REPO_ROOT/assets/reference/radxa/config.txt}}"
 DEFAULT_BOOT_MODE="${DEFAULT_BOOT_MODE:-immutable}"
 BOARD_DTB_NAME="${BOARD_DTB_NAME:-${BOARD_DTB_NAME_DEFAULT:-rk3588s-radxa-e54c-spi.dtb}}"
+SERIAL_TTY="${SERIAL_TTY:-${BOARD_SERIAL_TTY:-ttyFIQ0}}"
+SERIAL_BAUD="${SERIAL_BAUD:-${BOARD_SERIAL_BAUD:-1500000}}"
 ROOTFS_PARTLABEL="${ROOTFS_PARTLABEL:-rootfs}"
 ROOTFS_MKFS_LABEL="${ROOTFS_MKFS_LABEL:-$ROOTFS_PARTLABEL}"
 ENABLE_INITRAMFS_BOOT="${ENABLE_INITRAMFS_BOOT:-1}"
@@ -114,7 +116,7 @@ cp "$KERNEL_DTB" "$tmp_stage/boot/dtbs/rockchip/"
 
 if [ "$ENABLE_INITRAMFS_BOOT" = "1" ]; then
   initramfs_root="$tmp_stage/initramfs"
-  mkdir -p "$initramfs_root/bin" "$initramfs_root/lib" "$initramfs_root/proc" \
+  mkdir -p "$initramfs_root/bin" "$initramfs_root/sbin" "$initramfs_root/lib" "$initramfs_root/proc" \
     "$initramfs_root/sys" "$initramfs_root/dev" "$initramfs_root/newroot" "$initramfs_root/ovl"
 
   rootfs_tar_list="$tmp_stage/rootfs-tar.list"
@@ -129,6 +131,13 @@ if [ "$ENABLE_INITRAMFS_BOOT" = "1" ]; then
 
   tar -xf "$ROOTFS_TAR" -C "$initramfs_root" ./bin/busybox "$ld_musl_entry" "$libc_musl_entry"
   ln -snf busybox "$initramfs_root/bin/sh"
+  # Add common applet entrypoints so emergency shell is usable.
+  for applet in \
+    ls cat dmesg grep awk sed mount umount mkdir mknod sleep echo \
+    find head tail cut tr sort uniq wc printf test; do
+    ln -snf busybox "$initramfs_root/bin/$applet"
+  done
+  ln -snf ../bin/busybox "$initramfs_root/sbin/mdev"
 
   kernel_release="$(basename "$KERNEL_RELEASE_DIR")"
   overlay_module="$KERNEL_RELEASE_DIR/rootfs/lib/modules/$kernel_release/kernel/fs/overlayfs/overlay.ko"
@@ -171,7 +180,7 @@ for arg in \$CMDLINE; do
     rootfstype=*) root_fstype="\${arg#rootfstype=}" ;;
     overlaytmpfs=*) overlay_mode="\${arg#overlaytmpfs=}" ;;
     diskless=*) diskless_mode="\${arg#diskless=}" ;;
-    rootwait) root_wait_forever=1 ;;
+    rootwait) : ;;
     rootwait=*) root_wait_timeout="\${arg#rootwait=}" ;;
     rootdelay=*) root_delay="\${arg#rootdelay=}" ;;
   esac
@@ -266,8 +275,6 @@ while :; do
   \$BB sleep 1
 done
 
-log "Root device: \$root_dev"
-
 mount_root() {
   mode="\$1"
   if ! \$BB mount -o "\$mode" -t "\$root_fstype" "\$root_dev" /newroot 2>/dev/null; then
@@ -326,7 +333,7 @@ fi
 
 # Keep bootargs intentionally short and put root first.
 # Some U-Boot extlinux paths appear to truncate long APPEND lines.
-CMDLINE_BASE_DEFAULT="root=PARTLABEL=${ROOTFS_PARTLABEL} rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off"
+CMDLINE_BASE_DEFAULT="root=PARTLABEL=${ROOTFS_PARTLABEL} rootfstype=ext4 rootwait=30 console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off"
 CMDLINE_BASE="${KERNEL_CMDLINE_BASE:-$CMDLINE_BASE_DEFAULT}"
 CMDLINE_IMMUTABLE_DEFAULT="${CMDLINE_BASE} ro diskless=yes"
 CMDLINE_MAINTENANCE_DEFAULT="${CMDLINE_BASE} rw"

@@ -39,6 +39,8 @@ UPDATER_SERVICE_NAME="${UPDATER_SERVICE_NAME:-${BOARD_UPDATER_SERVICE_NAME:-${BO
 UPDATER_RUNNER_BIN="${UPDATER_RUNNER_BIN:-${BOARD_UPDATER_RUNNER_BIN:-${BOARD}-run-usb-update}}"
 UPDATER_ROOTMODE_SERVICE_NAME="${UPDATER_ROOTMODE_SERVICE_NAME:-${BOARD_ROOTMODE_SERVICE_NAME:-${BOARD}-root-mode}}"
 UPDATER_DTB_NAME="${UPDATER_DTB_NAME:-${BOARD_USB_UPDATER_DTB_NAME_DEFAULT:-${BOARD_DTB_NAME_DEFAULT:-rk3588s-radxa-e54c-spi.dtb}}}"
+SERIAL_TTY="${SERIAL_TTY:-${BOARD_SERIAL_TTY:-ttyFIQ0}}"
+SERIAL_BAUD="${SERIAL_BAUD:-${BOARD_SERIAL_BAUD:-1500000}}"
 
 # In containerized macOS workflows, bind-mounted /workspace can reject
 # extraction/deletion of many rootfs files. Prefer container-local paths.
@@ -155,6 +157,7 @@ if [ -z "$USB_IMAGE_SIZE" ]; then
 fi
 
 echo "Assembling USB updater image..."
+UPDATER_CMDLINE_COMMON="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait=30 ro diskless=yes console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off"
 IMAGE_PATH="$USB_UPDATER_IMAGE_PATH" \
 IMAGE_SIZE="$USB_IMAGE_SIZE" \
 ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \
@@ -163,8 +166,8 @@ ROOTFS_MKFS_LABEL="$UPDATER_ROOTFS_MKFS_LABEL" \
 INITRAMFS_NAME="$UPDATER_INITRAMFS_NAME" \
 BOOTCFG_PART_GPT_TYPE="EBD0A0A2-B9E5-4433-87C0-68B6B72699C7" \
 DEFAULT_BOOT_MODE=maintenance \
-KERNEL_CMDLINE_MAINTENANCE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off" \
-KERNEL_CMDLINE_IMMUTABLE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off" \
+KERNEL_CMDLINE_MAINTENANCE="$UPDATER_CMDLINE_COMMON" \
+KERNEL_CMDLINE_IMMUTABLE="$UPDATER_CMDLINE_COMMON" \
 "$SCRIPT_DIR/assemble-image.sh"
 
 tmp_extlinux="$(mktemp)"
@@ -180,7 +183,7 @@ LABEL updater
   LINUX /boot/Image
   INITRD /boot/${UPDATER_INITRAMFS_NAME}
   FDT /boot/dtbs/rockchip/${UPDATER_DTB_NAME}
-  APPEND root=PARTLABEL=${UPDATER_ROOT_PARTLABEL} rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off
+  APPEND ${UPDATER_CMDLINE_COMMON}
 EOF
 
 guestfish <<EOF
