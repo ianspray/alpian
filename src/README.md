@@ -113,7 +113,7 @@ All scripts in `scripts/` and their primary purpose:
 - `scripts/check-tooling.sh`
   - Verify required host build tools are installed.
 - `scripts/fetch-uboot-reference-assets.sh`
-  - Download/extract `idbloader.img`, `u-boot.itb`, and `rkboot.bin` into `assets/reference/u-boot`.
+  - Download the Radxa E54C SPI image and extract required `idbloader.img` and `u-boot.itb` into `assets/reference/u-boot`.
 - `scripts/fetch-radxa-kernel.sh`
   - Clone/update the Radxa kernel source tree used by kernel builds.
 - `scripts/build-kernel-e54c.sh`

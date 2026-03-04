@@ -42,8 +42,8 @@ These can be removed and will be recreated by scripts when needed.
 
 ## Regenerating U-Boot Reference Blobs
 
-If `assets/reference/u-boot/idbloader.img`, `assets/reference/u-boot/u-boot.itb`, or
-`assets/reference/u-boot/rkboot.bin` are missing, repopulate them with:
+If `assets/reference/u-boot/idbloader.img` or `assets/reference/u-boot/u-boot.itb`
+are missing, repopulate them with:
 
 ```bash
 scripts/fetch-uboot-reference-assets.sh

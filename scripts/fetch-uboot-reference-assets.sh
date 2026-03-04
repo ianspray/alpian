@@ -9,13 +9,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 UBOOT_ASSETS_DIR="${UBOOT_ASSETS_DIR:-$REPO_ROOT/assets/reference/u-boot}"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
-ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
-ALPINE_BRANCH="${ALPINE_BRANCH:-v3.23}"
-ALPINE_VERSION="${ALPINE_VERSION:-3.23.3}"
-ALPINE_ARCH="${ALPINE_ARCH:-aarch64}"
-UBOOT_BUNDLE_NAME="${UBOOT_BUNDLE_NAME:-alpine-uboot-${ALPINE_VERSION}-${ALPINE_ARCH}.tar.gz}"
-UBOOT_BUNDLE_URL="${UBOOT_BUNDLE_URL:-${ALPINE_MIRROR}/${ALPINE_BRANCH}/releases/${ALPINE_ARCH}/${UBOOT_BUNDLE_NAME}}"
-UBOOT_BUNDLE_PATH="${UBOOT_BUNDLE_PATH:-$DOWNLOAD_DIR/$UBOOT_BUNDLE_NAME}"
+SPI_BASE_IMAGE_URL="${SPI_BASE_IMAGE_URL:-https://dl.radxa.com/e/e54c/images/radxa-e54c-spi-flash-image-20250620.img}"
+SPI_BASE_IMAGE_PATH="${SPI_BASE_IMAGE_PATH:-$DOWNLOAD_DIR/radxa-e54c-spi-flash-image-20250620.img}"
+SPI_IMAGE_SIZE_BYTES="${SPI_IMAGE_SIZE_BYTES:-16777216}"
+SPI_IDBLOADER_LBA="${SPI_IDBLOADER_LBA:-64}"
+SPI_UBOOT_ITB_LBA="${SPI_UBOOT_ITB_LBA:-16384}"
+IDBLOADER_SIZE_BYTES="${IDBLOADER_SIZE_BYTES:-319488}"
+UBOOT_ITB_SIZE_BYTES="${UBOOT_ITB_SIZE_BYTES:-1484288}"
 
 FORCE_DOWNLOAD=0
 FORCE_OVERWRITE=0
@@ -24,10 +24,9 @@ usage() {
   cat <<'EOF'
 Usage: scripts/fetch-uboot-reference-assets.sh [--force-download] [--force-overwrite]
 
-Downloads Alpine U-Boot bundle and extracts:
+Downloads Radxa E54C SPI image and extracts:
   - idbloader.img
   - u-boot.itb
-  - rkboot.bin
 
 Destination:
   assets/reference/u-boot/
@@ -35,13 +34,13 @@ Destination:
 Environment overrides:
   UBOOT_ASSETS_DIR
   DOWNLOAD_DIR
-  ALPINE_MIRROR
-  ALPINE_BRANCH
-  ALPINE_VERSION
-  ALPINE_ARCH
-  UBOOT_BUNDLE_NAME
-  UBOOT_BUNDLE_URL
-  UBOOT_BUNDLE_PATH
+  SPI_BASE_IMAGE_URL
+  SPI_BASE_IMAGE_PATH
+  SPI_IMAGE_SIZE_BYTES
+  SPI_IDBLOADER_LBA
+  SPI_UBOOT_ITB_LBA
+  IDBLOADER_SIZE_BYTES
+  UBOOT_ITB_SIZE_BYTES
 EOF
 }
 
@@ -75,54 +74,89 @@ require_cmd() {
 }
 
 require_cmd curl
-require_cmd tar
-require_cmd awk
-require_cmd mktemp
+require_cmd dd
+require_cmd truncate
+require_cmd stat
 
 mkdir -p "$DOWNLOAD_DIR" "$UBOOT_ASSETS_DIR"
 
-if [ ! -f "$UBOOT_BUNDLE_PATH" ] || [ "$FORCE_DOWNLOAD" -eq 1 ]; then
-  echo "Downloading U-Boot bundle:"
-  echo "  URL:  $UBOOT_BUNDLE_URL"
-  echo "  PATH: $UBOOT_BUNDLE_PATH"
-  curl -fL --retry 3 --retry-delay 2 "$UBOOT_BUNDLE_URL" -o "$UBOOT_BUNDLE_PATH"
-else
-  echo "Using existing bundle: $UBOOT_BUNDLE_PATH"
+required_assets_ready=1
+for asset in idbloader.img u-boot.itb; do
+  if [ ! -f "$UBOOT_ASSETS_DIR/$asset" ]; then
+    required_assets_ready=0
+    break
+  fi
+done
+if [ "$required_assets_ready" -eq 1 ] && [ "$FORCE_OVERWRITE" -ne 1 ]; then
+  echo "Required U-Boot assets already present in: $UBOOT_ASSETS_DIR"
+  exit 0
 fi
 
-tmp_dir="$(mktemp -d)"
-trap 'rm -rf "$tmp_dir"' EXIT
+SPI_CHECKED=0
+SPI_AVAILABLE=0
 
-find_asset_path_in_tar() {
-  local tar_path="$1"
-  local asset_name="$2"
-  tar -tzf "$tar_path" | awk -v n="$asset_name" '$0 ~ ("(^|/)" n "$") { print; exit }'
+download_spi_base_if_needed() {
+  if [ "$SPI_CHECKED" -eq 1 ]; then
+    [ "$SPI_AVAILABLE" -eq 1 ]
+    return
+  fi
+  SPI_CHECKED=1
+
+  if [ ! -f "$SPI_BASE_IMAGE_PATH" ] || [ "$FORCE_DOWNLOAD" -eq 1 ]; then
+    echo "Downloading Radxa SPI base image:"
+    echo "  URL:  $SPI_BASE_IMAGE_URL"
+    echo "  PATH: $SPI_BASE_IMAGE_PATH"
+    if ! curl -fL --retry 3 --retry-delay 2 "$SPI_BASE_IMAGE_URL" -o "$SPI_BASE_IMAGE_PATH"; then
+      echo "Failed to download Radxa SPI base image: $SPI_BASE_IMAGE_URL" >&2
+      SPI_AVAILABLE=0
+      return 1
+    fi
+  else
+    echo "Using existing SPI base image: $SPI_BASE_IMAGE_PATH"
+  fi
+
+  SPI_AVAILABLE=1
+  return 0
 }
 
-extract_asset() {
+extract_from_spi_image() {
   local asset_name="$1"
+  local lba="$2"
+  local size_bytes="$3"
   local target_path="$UBOOT_ASSETS_DIR/$asset_name"
-  local tar_member=""
+  local sectors=0
 
   if [ -f "$target_path" ] && [ "$FORCE_OVERWRITE" -ne 1 ]; then
     echo "Keeping existing asset: $target_path"
     return 0
   fi
 
-  tar_member="$(find_asset_path_in_tar "$UBOOT_BUNDLE_PATH" "$asset_name")"
-  if [ -z "$tar_member" ]; then
-    echo "Asset '$asset_name' not found in $UBOOT_BUNDLE_PATH" >&2
+  if ! download_spi_base_if_needed; then
+    return 1
+  fi
+  if [ "$(stat -c%s "$SPI_BASE_IMAGE_PATH")" -ne "$SPI_IMAGE_SIZE_BYTES" ]; then
+    echo "Unexpected SPI image size: $(stat -c%s "$SPI_BASE_IMAGE_PATH") (expected $SPI_IMAGE_SIZE_BYTES)" >&2
     return 1
   fi
 
-  tar -xzf "$UBOOT_BUNDLE_PATH" -C "$tmp_dir" "$tar_member"
-  cp -f "$tmp_dir/$tar_member" "$target_path"
+  sectors=$(((size_bytes + 511) / 512))
+  dd if="$SPI_BASE_IMAGE_PATH" of="$target_path" bs=512 skip="$lba" count="$sectors" status=none
+  truncate -s "$size_bytes" "$target_path"
   chmod 0644 "$target_path"
-  echo "Installed: $target_path"
+  echo "Installed from SPI image: $target_path"
 }
 
-extract_asset "idbloader.img"
-extract_asset "u-boot.itb"
-extract_asset "rkboot.bin"
+if [ ! -f "$UBOOT_ASSETS_DIR/idbloader.img" ] || [ "$FORCE_OVERWRITE" -eq 1 ]; then
+  extract_from_spi_image "idbloader.img" "$SPI_IDBLOADER_LBA" "$IDBLOADER_SIZE_BYTES"
+fi
+
+if [ ! -f "$UBOOT_ASSETS_DIR/u-boot.itb" ] || [ "$FORCE_OVERWRITE" -eq 1 ]; then
+  extract_from_spi_image "u-boot.itb" "$SPI_UBOOT_ITB_LBA" "$UBOOT_ITB_SIZE_BYTES"
+fi
+
+if [ ! -f "$UBOOT_ASSETS_DIR/idbloader.img" ] || [ ! -f "$UBOOT_ASSETS_DIR/u-boot.itb" ]; then
+  echo "Failed to prepare required U-Boot assets (idbloader.img, u-boot.itb)." >&2
+  exit 1
+fi
 
 echo "U-Boot reference assets are ready in: $UBOOT_ASSETS_DIR"

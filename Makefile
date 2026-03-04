@@ -38,8 +38,7 @@ USB_IMAGE_STAMP := $(STAMPS_DIR)/usb-image.stamp
 UBOOT_ASSETS_DIR ?= $(ASSETS_DIR)/u-boot
 UBOOT_REQUIRED_ASSETS := \
   $(UBOOT_ASSETS_DIR)/idbloader.img \
-  $(UBOOT_ASSETS_DIR)/u-boot.itb \
-  $(UBOOT_ASSETS_DIR)/rkboot.bin
+  $(UBOOT_ASSETS_DIR)/u-boot.itb
 
 .PHONY: all images apk-repo uboot-assets kernel rootfs main-image usb-updater-image \
 	help clean clean-stamps distclean FORCE
@@ -156,7 +155,6 @@ $(UBOOT_ASSETS_STAMP): $(UBOOT_INPUTS_HASH) | $(STAMPS_DIR)
 	"$(SCRIPTS_DIR)/fetch-uboot-reference-assets.sh"
 	@test -f "$(UBOOT_ASSETS_DIR)/idbloader.img"
 	@test -f "$(UBOOT_ASSETS_DIR)/u-boot.itb"
-	@test -f "$(UBOOT_ASSETS_DIR)/rkboot.bin"
 	touch "$@"
 
 $(KERNEL_STAMP): $(KERNEL_INPUTS_HASH) | $(STAMPS_DIR)
