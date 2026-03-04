@@ -14,6 +14,10 @@ export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-$GUESTFS_TMP_DEFAULT}"
 export LIBGUESTFS_BACKEND="${LIBGUESTFS_BACKEND:-direct}"
 export LIBGUESTFS_TMPDIR="${LIBGUESTFS_TMPDIR:-$GUESTFS_TMP_DEFAULT}"
 export LIBGUESTFS_CACHEDIR="${LIBGUESTFS_CACHEDIR:-$GUESTFS_TMP_DEFAULT}"
+# Podman-on-mac often has no usable KVM in nested/containerized contexts.
+# Force TCG for guestfs appliance boot stability unless caller overrides.
+export LIBGUESTFS_BACKEND_SETTINGS="${LIBGUESTFS_BACKEND_SETTINGS:-force_tcg}"
+export LIBGUESTFS_MEMSIZE="${LIBGUESTFS_MEMSIZE:-1024}"
 
 IMAGE_PATH="${IMAGE_PATH:-$REPO_ROOT/build/e54c-alpine-custom.img}"
 IMAGE_SIZE="${IMAGE_SIZE:-8G}"
