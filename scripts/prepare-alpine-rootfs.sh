@@ -40,6 +40,12 @@ ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
 ROOTFS_TAR="${ROOTFS_TAR:-$REPO_ROOT/build/alpine-rootfs.tar}"
 DEFAULT_ROOT_AUTHORIZED_KEYS_FILE="$REPO_ROOT/assets/reference/alpine/root_authorized_keys"
 
+# In containerized macOS workflows, bind-mounted /workspace can reject
+# extraction/deletion of many rootfs files. Prefer a container-local path.
+if [ -z "$ROOTFS_DIR_WAS_SET" ] && [[ "$REPO_ROOT" == /workspace* ]]; then
+  ROOTFS_DIR="/tmp/e54c-alpine-rootfs"
+fi
+
 if [ "$ROOT_AUTHORIZED_KEYS_FILE" = "__AUTO__" ]; then
   if [ -f "$DEFAULT_ROOT_AUTHORIZED_KEYS_FILE" ]; then
     ROOT_AUTHORIZED_KEYS_FILE="$DEFAULT_ROOT_AUTHORIZED_KEYS_FILE"
@@ -79,7 +85,9 @@ extract_minirootfs() {
   local target_dir="$1"
   rm -rf "$target_dir"
   mkdir -p "$target_dir"
-  tar -xzf "$MINIROOTFS_PATH" -C "$target_dir"
+  if ! tar -xzf "$MINIROOTFS_PATH" -C "$target_dir"; then
+    return 1
+  fi
 }
 
 if ! extract_minirootfs "$ROOTFS_DIR"; then

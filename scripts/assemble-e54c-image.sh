@@ -6,7 +6,7 @@ export PATH="$PATH:/usr/sbin:/sbin"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-GUESTFS_TMP_DEFAULT="${REPO_ROOT}/build/guestfs-tmp"
+GUESTFS_TMP_DEFAULT="${GUESTFS_TMP_DEFAULT:-/tmp/e54c-guestfs-tmp}"
 mkdir -p "$GUESTFS_TMP_DEFAULT"
 
 export TMPDIR="${TMPDIR:-$GUESTFS_TMP_DEFAULT}"
@@ -67,6 +67,16 @@ for req in "$ROOTFS_TAR" "$UBOOT_DIR/idbloader.img" "$UBOOT_DIR/u-boot.itb" "$KE
     exit 1
   fi
 done
+
+# libguestfs/supermin requires a host kernel + modules available in the
+# build environment to construct its appliance.
+if ! ls /boot/vmlinuz* >/dev/null 2>&1 || ! ls -d /lib/modules/* >/dev/null 2>&1; then
+  echo "Missing host kernel artifacts required by libguestfs/supermin." >&2
+  echo "Expected: /boot/vmlinuz* and /lib/modules/*" >&2
+  echo "In the builder container, install a kernel package (e.g. linux-image-arm64)." >&2
+  echo "If you just updated Dockerfile.builder, rebuild with --rebuild-image." >&2
+  exit 1
+fi
 
 KERNEL_DTB="$KERNEL_RELEASE_DIR/boot/dtbs/rockchip/$BOARD_DTB_NAME"
 if [ ! -f "$KERNEL_DTB" ]; then

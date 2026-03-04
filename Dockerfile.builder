@@ -29,6 +29,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   kpartx \
   libssl-dev \
   libguestfs-tools \
+  linux-image-arm64 \
   mtools \
   openssl \
   parted \
