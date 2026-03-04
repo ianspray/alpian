@@ -169,5 +169,6 @@ fi
 
 echo "Custom APK repository ready: $repo_arch_dir"
 echo "Add this repository URL/path to: assets/reference/alpine/custom-repositories.txt"
-echo "Add custom package names to:    assets/reference/alpine/custom-packages.txt"
+echo "Add custom package names to:    boards/<board>/alpine/custom-packages.txt"
+echo "  (legacy fallback:             assets/reference/alpine/custom-packages.txt)"
 echo "Then rebuild rootfs/image with scripts/prepare-alpine-rootfs.sh and scripts/assemble-e54c-image.sh"

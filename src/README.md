@@ -121,6 +121,7 @@ All scripts in `scripts/` and their primary purpose:
   - Verify required host build tools are installed.
 - `scripts/fetch-uboot-reference-assets.sh`
   - Download board SPI image and extract required `idbloader.img` and `u-boot.itb` into `boards/<board>/u-boot`.
+  - Uses board fetch profile defaults from `boards/<board>/u-boot-fetch.env` when present.
 - `scripts/fetch-radxa-kernel.sh`
   - Clone/update the Radxa kernel source tree used by kernel builds.
   - Applies optional board-local patches from `boards/<board>/kernel/patches/*.patch`.
@@ -128,6 +129,8 @@ All scripts in `scripts/` and their primary purpose:
   - Build kernel image, modules, and DTBs for E54C.
 - `scripts/prepare-alpine-rootfs.sh`
   - Build and configure Alpine rootfs content.
+  - Uses board package defaults from `boards/<board>/alpine/packages.txt` and
+    board custom package defaults from `boards/<board>/alpine/custom-packages.txt`.
 - `scripts/assemble-e54c-image.sh`
   - Assemble final main NVMe image from build artifacts.
 - `scripts/build-usb-updater-image.sh`

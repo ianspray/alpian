@@ -1,0 +1,18 @@
+#!/sbin/openrc-run
+# SPDX-License-Identifier: MIT
+
+name="rock5b-partition-mount"
+description="Check a hardware device for partitions with labels, and mount them"
+command_background="no"
+
+depend() {
+  need devfs
+  need localmount
+  after modules
+}
+
+start() {
+  ebegin "Mounting additional storage volumes"
+  /usr/sbin/rock5b-partition-mount
+  eend $?
+}

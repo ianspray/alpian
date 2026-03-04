@@ -12,6 +12,8 @@ For full build/run details, see `src/README.md`.
   - Version-controlled reference inputs (configs, DTS patches, package lists, MOTD templates, keys).
 - `boards/`
   - Board-specific profiles and overrides. Use `BOARD=<name>` for builds (default: `e54c`).
+  - Includes board-local Alpine package lists (`boards/<board>/alpine/packages.txt`) and
+    U-Boot fetch profiles (`boards/<board>/u-boot-fetch.env`).
 - `apk/`
   - Custom Alpine APK package sources (`APKBUILD` + service payload files).
 - `src/`

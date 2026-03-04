@@ -1,0 +1,22 @@
+# Alpine packages pre-installed into the image rootfs.
+# One package per line.
+
+alpine-base
+alpine-conf
+openssh
+mtd-utils
+dosfstools
+e2fsprogs
+lsblk
+inotify-tools
+avahi
+vim
+curl
+file
+jq
+cfdisk
+tree
+caddy
+rock5b-openrc-services
+rock5b-partition-mount-service
+rock5b-usb-updater-services

@@ -1,0 +1,5 @@
+# Optional package names from custom repositories.
+# One package per line. Comment lines are ignored.
+#
+e54c-openrc-services
+e54c-usb-updater-services

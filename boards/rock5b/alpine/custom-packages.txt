@@ -1,0 +1,5 @@
+# Optional package names from custom repositories.
+# One package per line. Comment lines are ignored.
+#
+rock5b-openrc-services
+rock5b-usb-updater-services

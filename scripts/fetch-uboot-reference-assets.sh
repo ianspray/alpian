@@ -11,6 +11,12 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 source "$SCRIPT_DIR/lib/board-config.sh"
 load_board_config
 
+UBOOT_FETCH_PROFILE="${UBOOT_FETCH_PROFILE:-${BOARD_UBOOT_FETCH_PROFILE:-$REPO_ROOT/boards/$BOARD/u-boot-fetch.env}}"
+if [ -f "$UBOOT_FETCH_PROFILE" ]; then
+  # shellcheck disable=SC1090
+  source "$UBOOT_FETCH_PROFILE"
+fi
+
 UBOOT_ASSETS_DIR="${UBOOT_ASSETS_DIR:-${BOARD_UBOOT_ASSETS_DIR:-$REPO_ROOT/assets/reference/u-boot}}"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 SPI_BASE_IMAGE_FILENAME="${SPI_BASE_IMAGE_FILENAME:-${BOARD_SPI_BASE_IMAGE_FILENAME_DEFAULT:-radxa-$BOARD-spi-base.img}}"
@@ -39,6 +45,7 @@ Destination:
 Environment overrides:
   UBOOT_ASSETS_DIR
   DOWNLOAD_DIR
+  UBOOT_FETCH_PROFILE
   SPI_BASE_IMAGE_URL
   SPI_BASE_IMAGE_FILENAME
   SPI_BASE_IMAGE_PATH

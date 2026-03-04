@@ -128,6 +128,12 @@ $(ROOTFS_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	  if [ -f "$(BOARD_DIR)/alpine/modules" ]; then \
 	    printf '%s\0' "$(BOARD_DIR)/alpine/modules"; \
 	  fi; \
+	  if [ -f "$(BOARD_DIR)/alpine/packages.txt" ]; then \
+	    printf '%s\0' "$(BOARD_DIR)/alpine/packages.txt"; \
+	  fi; \
+	  if [ -f "$(BOARD_DIR)/alpine/custom-packages.txt" ]; then \
+	    printf '%s\0' "$(BOARD_DIR)/alpine/custom-packages.txt"; \
+	  fi; \
 	  if [ -n "$(ROOT_AUTHORIZED_KEYS_FILE_FOR_HASH)" ] && [ -f "$(ROOT_AUTHORIZED_KEYS_FILE_FOR_HASH)" ]; then \
 	    printf '%s\0' "$(ROOT_AUTHORIZED_KEYS_FILE_FOR_HASH)"; \
 	  fi; \
@@ -143,6 +149,9 @@ $(UBOOT_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	    $(BOARD_DIR)/board.env \
 	    scripts/fetch-uboot-reference-assets.sh \
 	    scripts/check-tooling.sh; \
+	  if [ -f "$(BOARD_DIR)/u-boot-fetch.env" ]; then \
+	    printf '%s\0' "$(BOARD_DIR)/u-boot-fetch.env"; \
+	  fi; \
 	} | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $$1}' >"$@.tmp"
 	@if [ ! -f "$@" ] || ! cmp -s "$@.tmp" "$@"; then mv "$@.tmp" "$@"; else rm -f "$@.tmp"; fi
 
