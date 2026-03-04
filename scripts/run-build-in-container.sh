@@ -6,7 +6,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 CONTAINER_RUNTIME="${CONTAINER_RUNTIME:-}"
-BUILDER_IMAGE_TAG="${BUILDER_IMAGE_TAG:-e54c-builder:bookworm}"
+BUILDER_IMAGE_TAG="${BUILDER_IMAGE_TAG:-radxa-builder:bookworm}"
 BUILDER_DOCKERFILE="${BUILDER_DOCKERFILE:-$REPO_ROOT/Dockerfile.builder}"
 REBUILD_IMAGE=0
 FIX_PERMS=1
@@ -18,7 +18,7 @@ Usage:
 
 Options:
   --runtime <docker|podman>   Container runtime to use.
-  --image-tag <tag>           Builder image tag (default: e54c-builder:bookworm).
+  --image-tag <tag>           Builder image tag (default: radxa-builder:bookworm).
   --dockerfile <path>         Dockerfile path (default: ./Dockerfile.builder).
   --rebuild-image             Force image rebuild.
   --no-fix-perms              Skip post-build chown of generated files.

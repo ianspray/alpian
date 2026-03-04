@@ -1,2 +1,22 @@
-# ROCK 5B custom kernel fragment.
-# Add board-specific Kconfig overrides here as needed.
+CONFIG_LOCALVERSION="-rock5b-custom"
+CONFIG_DEFAULT_HOSTNAME="rock5b-alpine"
+CONFIG_MODULES=y
+CONFIG_MODULE_UNLOAD=y
+CONFIG_DEVTMPFS=y
+CONFIG_DEVTMPFS_MOUNT=y
+CONFIG_TMPFS=y
+CONFIG_EXT4_FS=y
+CONFIG_FAT_FS=y
+CONFIG_MSDOS_FS=y
+CONFIG_VFAT_FS=y
+CONFIG_EFI_PARTITION=y
+CONFIG_NVME_CORE=y
+CONFIG_BLK_DEV_NVME=y
+
+# Disable vendor Mali drivers/embedded CSF firmware.
+# The Radxa tree expects drivers/gpu/arm/bifrost/mali_csffw.bin when enabled.
+# CONFIG_MALI400 is not set
+# CONFIG_MALI450 is not set
+# CONFIG_MALI_MIDGARD is not set
+# CONFIG_MALI_BIFROST is not set
+# CONFIG_MALI_CSF_INCLUDE_FW is not set

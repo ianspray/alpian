@@ -40,7 +40,7 @@ BOARD=rock5b scripts/run-build-in-container.sh --runtime podman
 
 This will:
 
-1. Build `e54c-builder:bookworm` from `Dockerfile.builder` if missing.
+1. Build `radxa-builder:bookworm` from `Dockerfile.builder` if missing.
 2. Start a privileged container with the repo bind-mounted at `/workspace`.
 3. Run `make images` inside the container.
 4. Write artifacts to host `build/` through the bind mount.
@@ -76,7 +76,7 @@ scripts/run-build-in-container.sh --runtime podman
 Use a custom image tag:
 
 ```bash
-scripts/run-build-in-container.sh --image-tag e54c-builder:local
+scripts/run-build-in-container.sh --image-tag radxa-builder:local
 ```
 
 Expected output image names:
