@@ -4,9 +4,9 @@ This document defines a sustainable update model for this repository and device.
 
 ## Current Build Model
 
-1. Kernel, DTB, and modules are built by `scripts/build-kernel-e54c.sh`.
+1. Kernel, DTB, and modules are built by `scripts/build-kernel.sh`.
 2. Alpine userland rootfs is built by `scripts/prepare-alpine-rootfs.sh`.
-3. Final image is assembled by `scripts/assemble-e54c-image.sh`.
+3. Final image is assembled by `scripts/assemble-image.sh`.
 4. Final image is flashed by `scripts/write-image-to-nvme.sh`.
 
 The current runtime layout is:
@@ -39,7 +39,7 @@ Recommended process:
 
 ```bash
 ALPINE_BRANCH=v3.24 ALPINE_VERSION=3.24.0 scripts/prepare-alpine-rootfs.sh
-scripts/assemble-e54c-image.sh
+scripts/assemble-image.sh
 ```
 
 3. Validate image contents before flash:
@@ -75,14 +75,14 @@ Recommended process:
 2. Build with full modules:
 
 ```bash
-KERNEL_BRANCH=linux-6.6-some-branch scripts/build-kernel-e54c.sh
+KERNEL_BRANCH=linux-6.6-some-branch scripts/build-kernel.sh
 ```
 
 3. Rebuild rootfs + image to include matching modules and boot artifacts:
 
 ```bash
 scripts/prepare-alpine-rootfs.sh
-scripts/assemble-e54c-image.sh
+scripts/assemble-image.sh
 ```
 
 4. Validate before flash:
@@ -102,7 +102,7 @@ Sustainability notes:
 If USB boot probing in U-Boot is broken (`usb start` shows no working controllers), update SPI U-Boot with the E54C USB DTS patch flow:
 
 ```bash
-scripts/build-uboot-e54c-spi.sh
+scripts/build-uboot-spi.sh
 ```
 
 Outputs are placed under `build/u-boot-artifacts/` and include:
@@ -133,7 +133,7 @@ Use maintenance mode when you intentionally want writes to base storage.
 2. Or build image with maintenance as default:
 
 ```bash
-DEFAULT_BOOT_MODE=maintenance scripts/assemble-e54c-image.sh
+DEFAULT_BOOT_MODE=maintenance scripts/assemble-image.sh
 ```
 
 ### Typical Maintenance Tasks

@@ -32,10 +32,10 @@ For full build/run details, see `src/README.md`.
 These can be removed and will be recreated by scripts when needed.
 
 - `build/`
-  - Recreated by all build scripts (`scripts/build-*.sh`, `scripts/prepare-alpine-rootfs.sh`, `scripts/assemble-e54c-image.sh`).
+  - Recreated by all build scripts (`scripts/build-*.sh`, `scripts/prepare-alpine-rootfs.sh`, `scripts/assemble-image.sh`).
   - Contains outputs like kernel artifacts, rootfs tarball, image files, APK repo, U-Boot build trees.
 - `src/radxa-kernel-<board>/`
-  - Recreated by `scripts/fetch-radxa-kernel.sh` (called by `scripts/build-kernel-e54c.sh`).
+  - Recreated by `scripts/fetch-radxa-kernel.sh` (called by `scripts/build-kernel.sh`).
   - This is a local git clone of the Radxa kernel branch.
 
 ## Safe-To-Delete But Not Script-Critical
@@ -59,9 +59,9 @@ scripts/fetch-uboot-reference-assets.sh
 BOARD=e54c scripts/check-tooling.sh
 BOARD=e54c scripts/fetch-uboot-reference-assets.sh
 BOARD=e54c scripts/build-apk-repo.sh
-BOARD=e54c scripts/build-kernel-e54c.sh
+BOARD=e54c scripts/build-kernel.sh
 BOARD=e54c scripts/prepare-alpine-rootfs.sh
-BOARD=e54c scripts/assemble-e54c-image.sh
+BOARD=e54c scripts/assemble-image.sh
 BOARD=e54c scripts/build-usb-updater-image.sh
 ```
 
@@ -77,9 +77,9 @@ Legacy explicit sequence (still valid):
 scripts/check-tooling.sh
 scripts/fetch-uboot-reference-assets.sh
 scripts/build-apk-repo.sh
-scripts/build-kernel-e54c.sh
+scripts/build-kernel.sh
 scripts/prepare-alpine-rootfs.sh
-scripts/assemble-e54c-image.sh
+scripts/assemble-image.sh
 scripts/build-usb-updater-image.sh
 ```
 

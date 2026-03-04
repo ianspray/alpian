@@ -88,7 +88,7 @@ require_cmd awk
 
 if [ ! -f "$NVME_IMAGE_PATH" ]; then
   echo "NVMe image not found: $NVME_IMAGE_PATH" >&2
-  echo "Build it first with scripts/build-all-e54c.sh or scripts/assemble-e54c-image.sh (BOARD=$BOARD)." >&2
+  echo "Build it first with scripts/build-all.sh or scripts/assemble-image.sh (BOARD=$BOARD)." >&2
   exit 1
 fi
 
@@ -165,7 +165,7 @@ BOOTCFG_PART_GPT_TYPE="EBD0A0A2-B9E5-4433-87C0-68B6B72699C7" \
 DEFAULT_BOOT_MODE=maintenance \
 KERNEL_CMDLINE_MAINTENANCE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off" \
 KERNEL_CMDLINE_IMMUTABLE="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait ro diskless=yes console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off" \
-"$SCRIPT_DIR/assemble-e54c-image.sh"
+"$SCRIPT_DIR/assemble-image.sh"
 
 tmp_extlinux="$(mktemp)"
 trap 'rm -f "$tmp_extlinux"' EXIT

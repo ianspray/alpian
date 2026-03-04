@@ -42,7 +42,7 @@ http://<host>:8080/v3.23
 
 ```bash
 scripts/prepare-alpine-rootfs.sh
-scripts/assemble-e54c-image.sh
+scripts/assemble-image.sh
 ```
 
 `prepare-alpine-rootfs.sh` now reads:

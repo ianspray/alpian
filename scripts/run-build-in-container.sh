@@ -34,7 +34,7 @@ Examples:
   scripts/run-build-in-container.sh
   BOARD=rock5b scripts/run-build-in-container.sh -- make main-image
   scripts/run-build-in-container.sh -- make main-image
-  scripts/run-build-in-container.sh --rebuild-image -- scripts/build-all-e54c.sh
+  scripts/run-build-in-container.sh --rebuild-image -- scripts/build-all.sh
 EOF
 }
 

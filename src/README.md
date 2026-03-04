@@ -16,9 +16,9 @@ Select a board with `BOARD=<name>` (default: `e54c`).
 BOARD=e54c scripts/check-tooling.sh
 BOARD=e54c scripts/fetch-uboot-reference-assets.sh
 BOARD=e54c scripts/build-apk-repo.sh
-BOARD=e54c scripts/build-kernel-e54c.sh
+BOARD=e54c scripts/build-kernel.sh
 BOARD=e54c scripts/prepare-alpine-rootfs.sh
-BOARD=e54c scripts/assemble-e54c-image.sh
+BOARD=e54c scripts/assemble-image.sh
 ```
 
 Equivalent:
@@ -30,7 +30,7 @@ make BOARD=e54c main-image
 One-shot pipeline:
 
 ```bash
-scripts/build-all-e54c.sh
+scripts/build-all.sh
 ```
 
 Containerized pipeline (recommended for macOS hosts):
@@ -54,7 +54,7 @@ scripts/build-usb-updater-image.sh
 Build patched SPI U-Boot for E54C USB host bring-up:
 
 ```bash
-scripts/build-uboot-e54c-spi.sh
+scripts/build-uboot-spi.sh
 ```
 
 Build/sign all custom APK packages in `apk/aports`:
@@ -125,17 +125,17 @@ All scripts in `scripts/` and their primary purpose:
 - `scripts/fetch-radxa-kernel.sh`
   - Clone/update the Radxa kernel source tree used by kernel builds.
   - Applies optional board-local patches from `boards/<board>/kernel/patches/*.patch`.
-- `scripts/build-kernel-e54c.sh`
+- `scripts/build-kernel.sh`
   - Build kernel image, modules, and DTBs for E54C.
 - `scripts/prepare-alpine-rootfs.sh`
   - Build and configure Alpine rootfs content.
   - Uses board package defaults from `boards/<board>/alpine/packages.txt` and
     board custom package defaults from `boards/<board>/alpine/custom-packages.txt`.
-- `scripts/assemble-e54c-image.sh`
+- `scripts/assemble-image.sh`
   - Assemble final main NVMe image from build artifacts.
 - `scripts/build-usb-updater-image.sh`
   - Build USB updater image that reflashes NVMe and reboots.
-- `scripts/build-uboot-e54c-spi.sh`
+- `scripts/build-uboot-spi.sh`
   - Build SPI U-Boot artifacts (including `spi-u-boot-16MiB.img`).
 - `scripts/build-apk-repo.sh`
   - Build/sign local custom APK repository (Podman-based).
@@ -143,7 +143,7 @@ All scripts in `scripts/` and their primary purpose:
   - Serve local custom APK repository over HTTP for testing.
 - `scripts/new-openrc-apk.sh`
   - Scaffold a new OpenRC-service APK package.
-- `scripts/build-all-e54c.sh`
+- `scripts/build-all.sh`
   - Run the common full build pipeline in one command.
 - `scripts/run-build-in-container.sh`
   - Build and run the Debian-based containerized pipeline (useful on macOS hosts).
@@ -156,9 +156,9 @@ Most common operating sequence:
 scripts/check-tooling.sh
 scripts/fetch-uboot-reference-assets.sh
 scripts/build-apk-repo.sh
-scripts/build-kernel-e54c.sh
+scripts/build-kernel.sh
 scripts/prepare-alpine-rootfs.sh
-scripts/assemble-e54c-image.sh
+scripts/assemble-image.sh
 scripts/build-usb-updater-image.sh
 ```
 
@@ -172,7 +172,7 @@ scripts/build-usb-updater-image.sh
 - U-Boot bootloader blobs are written at:
   - `idbloader.img` -> LBA `64`
   - `u-boot.itb` -> LBA `16384`
-- `scripts/build-uboot-e54c-spi.sh` also emits a pre-composed SPI image:
+- `scripts/build-uboot-spi.sh` also emits a pre-composed SPI image:
   - `spi-u-boot-16MiB.img`
   - built by default from the latest Radxa SPI base image with patched `u-boot.itb` injected
   - ready to write from byte `0` of SPI (to `/dev/mtd0` with `flashcp`)
@@ -248,13 +248,13 @@ scripts/build-usb-updater-image.sh
   - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-main scripts/prepare-alpine-rootfs.sh`
   - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-updater scripts/prepare-alpine-rootfs.sh`
 - Override default DTB used by extlinux and `/boot/efi/boot/dtbs/rockchip`:
-  - `BOARD_DTB_NAME=rk3588s-radxa-e54c.dtb scripts/assemble-e54c-image.sh`
+  - `BOARD_DTB_NAME=rk3588s-radxa-e54c.dtb scripts/assemble-image.sh`
 - Override diskless cmdline:
-  - `KERNEL_CMDLINE_IMMUTABLE='root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off ro diskless=yes' scripts/assemble-e54c-image.sh`
+  - `KERNEL_CMDLINE_IMMUTABLE='root=PARTLABEL=rootfs rootfstype=ext4 rootwait console=ttyFIQ0,1500000n8 earlycon nvme_core.default_ps_max_latency_us=0 pcie_aspm=off ro diskless=yes' scripts/assemble-image.sh`
 - Disable initramfs boot path (falls back to direct kernel root mount):
-  - `ENABLE_INITRAMFS_BOOT=0 scripts/assemble-e54c-image.sh`
+  - `ENABLE_INITRAMFS_BOOT=0 scripts/assemble-image.sh`
 - Override generated initramfs filename:
-  - `INITRAMFS_NAME=initramfs-e54c.cpio.gz scripts/assemble-e54c-image.sh`
+  - `INITRAMFS_NAME=initramfs-e54c.cpio.gz scripts/assemble-image.sh`
 - Customize fixed peripheral permissions (on target):
   - edit `/etc/conf.d/e54c-dev-perms` and add rules like:
   - `/dev/ttyUSB* root:dialout 0660`

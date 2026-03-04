@@ -99,7 +99,7 @@ $(KERNEL_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	@{ \
 	  printf '%s\0' \
 	    $(BOARD_DIR)/board.env \
-	    scripts/build-kernel-e54c.sh \
+	    scripts/build-kernel.sh \
 	    scripts/fetch-radxa-kernel.sh \
 	    scripts/check-tooling.sh; \
 	  if [ -f "$(BOARD_DIR)/kernel/custom-kernel.fragment" ]; then \
@@ -159,7 +159,7 @@ $(MAIN_IMAGE_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	@{ \
 	  printf '%s\0' \
 	    $(BOARD_DIR)/board.env \
-	    scripts/assemble-e54c-image.sh \
+	    scripts/assemble-image.sh \
 	    scripts/check-tooling.sh; \
 	} | sort -z | xargs -0 sha256sum | sha256sum | awk '{print $$1}' >"$@.tmp"
 	@if [ ! -f "$@" ] || ! cmp -s "$@.tmp" "$@"; then mv "$@.tmp" "$@"; else rm -f "$@.tmp"; fi
@@ -184,7 +184,7 @@ $(UBOOT_ASSETS_STAMP): $(UBOOT_INPUTS_HASH) | $(STAMPS_DIR)
 	touch "$@"
 
 $(KERNEL_STAMP): $(KERNEL_INPUTS_HASH) | $(STAMPS_DIR)
-	"$(SCRIPTS_DIR)/build-kernel-e54c.sh"
+	"$(SCRIPTS_DIR)/build-kernel.sh"
 	touch "$@"
 
 $(ROOTFS_STAMP): $(ROOTFS_INPUTS_HASH) $(APK_REPO_STAMP) | $(STAMPS_DIR)
@@ -192,7 +192,7 @@ $(ROOTFS_STAMP): $(ROOTFS_INPUTS_HASH) $(APK_REPO_STAMP) | $(STAMPS_DIR)
 	touch "$@"
 
 $(MAIN_IMAGE_STAMP): $(MAIN_IMAGE_INPUTS_HASH) $(UBOOT_ASSETS_STAMP) $(KERNEL_STAMP) $(ROOTFS_STAMP) | $(STAMPS_DIR)
-	"$(SCRIPTS_DIR)/assemble-e54c-image.sh"
+	"$(SCRIPTS_DIR)/assemble-image.sh"
 	@test -f "$(MAIN_IMAGE)"
 	touch "$@"
 
