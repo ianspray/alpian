@@ -41,6 +41,8 @@ UPDATER_ROOTMODE_SERVICE_NAME="${UPDATER_ROOTMODE_SERVICE_NAME:-${BOARD_ROOTMODE
 UPDATER_DTB_NAME="${UPDATER_DTB_NAME:-${BOARD_USB_UPDATER_DTB_NAME_DEFAULT:-${BOARD_DTB_NAME_DEFAULT:-rk3588s-radxa-e54c-spi.dtb}}}"
 SERIAL_TTY="${SERIAL_TTY:-${BOARD_SERIAL_TTY:-ttyFIQ0}}"
 SERIAL_BAUD="${SERIAL_BAUD:-${BOARD_SERIAL_BAUD:-1500000}}"
+UPDATER_DISKLESS_TMPFS_MARGIN_MIB="${UPDATER_DISKLESS_TMPFS_MARGIN_MIB:-${DISKLESS_TMPFS_MARGIN_MIB:-200}}"
+UPDATER_DISKLESS_TMPFS_SIZE_MIB="${UPDATER_DISKLESS_TMPFS_SIZE_MIB:-}"
 
 # In containerized macOS workflows, bind-mounted /workspace can reject
 # extraction/deletion of many rootfs files. Prefer container-local paths.
@@ -145,6 +147,21 @@ ln -snf "/etc/init.d/$UPDATER_SERVICE_NAME" "$UPDATER_ROOTFS_DIR/etc/runlevels/b
 
 tar --numeric-owner --owner=0 --group=0 -C "$UPDATER_ROOTFS_DIR" -cf "$UPDATER_ROOTFS_TAR" .
 
+if [ -z "$UPDATER_DISKLESS_TMPFS_SIZE_MIB" ]; then
+  updater_rootfs_tar_bytes="$(stat -c%s "$UPDATER_ROOTFS_TAR" 2>/dev/null || stat -f%z "$UPDATER_ROOTFS_TAR")"
+  if [ -z "$updater_rootfs_tar_bytes" ] || [ "$updater_rootfs_tar_bytes" -le 0 ] 2>/dev/null; then
+    echo "Unable to determine updater rootfs tar size: $UPDATER_ROOTFS_TAR" >&2
+    exit 1
+  fi
+  updater_rootfs_tar_mib=$(((updater_rootfs_tar_bytes + 1024 * 1024 - 1) / (1024 * 1024)))
+  UPDATER_DISKLESS_TMPFS_SIZE_MIB=$((updater_rootfs_tar_mib + UPDATER_DISKLESS_TMPFS_MARGIN_MIB))
+fi
+
+if ! [[ "$UPDATER_DISKLESS_TMPFS_SIZE_MIB" =~ ^[0-9]+$ ]] || [ "$UPDATER_DISKLESS_TMPFS_SIZE_MIB" -lt 1 ]; then
+  echo "Invalid UPDATER_DISKLESS_TMPFS_SIZE_MIB value: $UPDATER_DISKLESS_TMPFS_SIZE_MIB" >&2
+  exit 1
+fi
+
 if [ -z "$USB_IMAGE_SIZE" ]; then
   payload_bytes="$(stat -c%s "$UPDATER_PAYLOAD_FILE")"
   overhead_bytes=$((UPDATER_OVERHEAD_MIB * 1024 * 1024))
@@ -157,7 +174,7 @@ if [ -z "$USB_IMAGE_SIZE" ]; then
 fi
 
 echo "Assembling USB updater image..."
-UPDATER_CMDLINE_COMMON="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait=30 ro diskless=yes console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off"
+UPDATER_CMDLINE_COMMON="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait=30 ro diskless=yes diskless_tmpfs_size=${UPDATER_DISKLESS_TMPFS_SIZE_MIB} console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off"
 IMAGE_PATH="$USB_UPDATER_IMAGE_PATH" \
 IMAGE_SIZE="$USB_IMAGE_SIZE" \
 ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \

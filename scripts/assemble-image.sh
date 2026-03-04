@@ -42,6 +42,8 @@ CONFIG_PART_GPT_TYPE="${CONFIG_PART_GPT_TYPE:-0FC63DAF-8483-4772-8E79-3D69D8477D
 BOOTCFG_PART_GPT_TYPE="${BOOTCFG_PART_GPT_TYPE:-C12A7328-F81F-11D2-BA4B-00A0C93EC93B}"
 SPI_IDBLOADER_LBA="${SPI_IDBLOADER_LBA:-${BOARD_SPI_IDBLOADER_LBA_DEFAULT:-64}}"
 SPI_UBOOT_ITB_LBA="${SPI_UBOOT_ITB_LBA:-${BOARD_SPI_UBOOT_ITB_LBA_DEFAULT:-16384}}"
+DISKLESS_TMPFS_MARGIN_MIB="${DISKLESS_TMPFS_MARGIN_MIB:-200}"
+DISKLESS_TMPFS_SIZE_MIB="${DISKLESS_TMPFS_SIZE_MIB:-}"
 
 # Partition geometry (512-byte sectors):
 # - p1 config: 256 MiB (starts at 16 MiB)
@@ -80,6 +82,26 @@ for req in "$ROOTFS_TAR" "$UBOOT_DIR/idbloader.img" "$UBOOT_DIR/u-boot.itb" "$KE
     exit 1
   fi
 done
+
+file_size_bytes() {
+  local file="$1"
+  stat -c%s "$file" 2>/dev/null || stat -f%z "$file"
+}
+
+if [ -z "$DISKLESS_TMPFS_SIZE_MIB" ]; then
+  rootfs_tar_bytes="$(file_size_bytes "$ROOTFS_TAR")"
+  if [ -z "$rootfs_tar_bytes" ] || [ "$rootfs_tar_bytes" -le 0 ] 2>/dev/null; then
+    echo "Unable to determine size for ROOTFS_TAR: $ROOTFS_TAR" >&2
+    exit 1
+  fi
+  rootfs_tar_mib=$(((rootfs_tar_bytes + 1024 * 1024 - 1) / (1024 * 1024)))
+  DISKLESS_TMPFS_SIZE_MIB=$((rootfs_tar_mib + DISKLESS_TMPFS_MARGIN_MIB))
+fi
+
+if ! [[ "$DISKLESS_TMPFS_SIZE_MIB" =~ ^[0-9]+$ ]] || [ "$DISKLESS_TMPFS_SIZE_MIB" -lt 1 ]; then
+  echo "Invalid DISKLESS_TMPFS_SIZE_MIB value: $DISKLESS_TMPFS_SIZE_MIB" >&2
+  exit 1
+fi
 
 # libguestfs/supermin requires a host kernel + modules available in the
 # build environment to construct its appliance.
@@ -167,6 +189,7 @@ root_spec=""
 root_fstype="ext4"
 overlay_mode="no"
 diskless_mode="no"
+diskless_tmpfs_size_mib=""
 root_wait_forever=0
 root_wait_timeout=30
 root_delay=0
@@ -180,6 +203,7 @@ for arg in \$CMDLINE; do
     rootfstype=*) root_fstype="\${arg#rootfstype=}" ;;
     overlaytmpfs=*) overlay_mode="\${arg#overlaytmpfs=}" ;;
     diskless=*) diskless_mode="\${arg#diskless=}" ;;
+    diskless_tmpfs_size=*) diskless_tmpfs_size_mib="\${arg#diskless_tmpfs_size=}" ;;
     rootwait) : ;;
     rootwait=*) root_wait_timeout="\${arg#rootwait=}" ;;
     rootdelay=*) root_delay="\${arg#rootdelay=}" ;;
@@ -187,6 +211,9 @@ for arg in \$CMDLINE; do
 done
 
 [ -n "\$root_spec" ] || panic "Missing root= kernel argument."
+if [ -n "\$diskless_tmpfs_size_mib" ] && ! \$BB echo "\$diskless_tmpfs_size_mib" | \$BB grep -Eq '^[0-9]+$'; then
+  panic "Invalid diskless_tmpfs_size value: \$diskless_tmpfs_size_mib"
+fi
 
 \$BB mount -t sysfs sysfs /sys
 \$BB mount -t devtmpfs devtmpfs /dev
@@ -307,7 +334,11 @@ else
     if ! \$BB mount -o ro -t "\$root_fstype" "\$root_dev" /media/rootsrc 2>/dev/null; then
       \$BB mount -o ro "\$root_dev" /media/rootsrc
     fi
-    \$BB mount -t tmpfs -o mode=0755 tmpfs /newroot
+    tmpfs_opts="mode=0755"
+    if [ -n "\$diskless_tmpfs_size_mib" ] && [ "\$diskless_tmpfs_size_mib" -gt 0 ]; then
+      tmpfs_opts="\${tmpfs_opts},size=\${diskless_tmpfs_size_mib}m"
+    fi
+    \$BB mount -t tmpfs -o "\$tmpfs_opts" tmpfs /newroot
     (cd /media/rootsrc && \$BB tar -cf - .) | (cd /newroot && \$BB tar -xf -)
     \$BB mkdir -p /newroot/.diskless-source
     \$BB mount --move /media/rootsrc /newroot/.diskless-source
@@ -335,7 +366,7 @@ fi
 # Some U-Boot extlinux paths appear to truncate long APPEND lines.
 CMDLINE_BASE_DEFAULT="root=PARTLABEL=${ROOTFS_PARTLABEL} rootfstype=ext4 rootwait=30 console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off"
 CMDLINE_BASE="${KERNEL_CMDLINE_BASE:-$CMDLINE_BASE_DEFAULT}"
-CMDLINE_IMMUTABLE_DEFAULT="${CMDLINE_BASE} ro diskless=yes"
+CMDLINE_IMMUTABLE_DEFAULT="${CMDLINE_BASE} ro diskless=yes diskless_tmpfs_size=${DISKLESS_TMPFS_SIZE_MIB}"
 CMDLINE_MAINTENANCE_DEFAULT="${CMDLINE_BASE} rw"
 CMDLINE_IMMUTABLE="${KERNEL_CMDLINE_IMMUTABLE:-${KERNEL_CMDLINE:-$CMDLINE_IMMUTABLE_DEFAULT}}"
 CMDLINE_MAINTENANCE="${KERNEL_CMDLINE_MAINTENANCE:-$CMDLINE_MAINTENANCE_DEFAULT}"
