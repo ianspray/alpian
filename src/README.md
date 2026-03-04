@@ -123,6 +123,7 @@ All scripts in `scripts/` and their primary purpose:
   - Download board SPI image and extract required `idbloader.img` and `u-boot.itb` into `boards/<board>/u-boot`.
 - `scripts/fetch-radxa-kernel.sh`
   - Clone/update the Radxa kernel source tree used by kernel builds.
+  - Applies optional board-local patches from `boards/<board>/kernel/patches/*.patch`.
 - `scripts/build-kernel-e54c.sh`
   - Build kernel image, modules, and DTBs for E54C.
 - `scripts/prepare-alpine-rootfs.sh`
@@ -159,6 +160,11 @@ scripts/build-usb-updater-image.sh
 ```
 
 ## Notes
+
+- Kernel source defaults are aligned across boards (`e54c`, `rock5b`) to the same
+  Radxa branch by default. Board differences should be kept in:
+  - `boards/<board>/kernel/custom-kernel.fragment`
+  - `boards/<board>/kernel/patches/*.patch` (only when required)
 
 - U-Boot bootloader blobs are written at:
   - `idbloader.img` -> LBA `64`

@@ -15,14 +15,37 @@ KERNEL_REPO="${KERNEL_REPO:-${BOARD_KERNEL_REPO_DEFAULT:-https://github.com/radx
 KERNEL_BRANCH="${KERNEL_BRANCH:-${BOARD_KERNEL_BRANCH_DEFAULT:-linux-6.1-stan-rkr5.1}}"
 KERNEL_DIR="${KERNEL_DIR:-$REPO_ROOT/src/radxa-kernel-$BOARD}"
 KERNEL_EXPECTED_DTS="${KERNEL_EXPECTED_DTS:-$BOARD_KERNEL_EXPECTED_DTS}"
+KERNEL_PATCH_DIR="${KERNEL_PATCH_DIR:-${BOARD_KERNEL_PATCH_DIR:-$REPO_ROOT/boards/$BOARD/kernel/patches}}"
 
 if [ -d "$KERNEL_DIR/.git" ]; then
   echo "Refreshing existing kernel checkout in $KERNEL_DIR"
   git -C "$KERNEL_DIR" fetch --depth 1 origin "$KERNEL_BRANCH"
-  git -C "$KERNEL_DIR" checkout -B "$KERNEL_BRANCH" "origin/$KERNEL_BRANCH"
+  git -C "$KERNEL_DIR" checkout -f -B "$KERNEL_BRANCH" "origin/$KERNEL_BRANCH"
 else
   echo "Cloning $KERNEL_REPO ($KERNEL_BRANCH) into $KERNEL_DIR"
   git clone --depth 1 --branch "$KERNEL_BRANCH" "$KERNEL_REPO" "$KERNEL_DIR"
+fi
+
+if [ -d "$KERNEL_PATCH_DIR" ]; then
+  shopt -s nullglob
+  kernel_patches=("$KERNEL_PATCH_DIR"/*.patch)
+  shopt -u nullglob
+
+  if [ "${#kernel_patches[@]}" -gt 0 ]; then
+    echo "Applying board kernel patches from $KERNEL_PATCH_DIR"
+    for patch_file in "${kernel_patches[@]}"; do
+      patch_name="$(basename "$patch_file")"
+      if git -C "$KERNEL_DIR" apply --check "$patch_file" >/dev/null 2>&1; then
+        git -C "$KERNEL_DIR" apply "$patch_file"
+        echo "  applied: $patch_name"
+      elif git -C "$KERNEL_DIR" apply -R --check "$patch_file" >/dev/null 2>&1; then
+        echo "  already applied: $patch_name"
+      else
+        echo "Kernel patch failed to apply cleanly: $patch_file" >&2
+        exit 1
+      fi
+    done
+  fi
 fi
 
 EXPECTED_DTS_PATH="$KERNEL_DIR/$KERNEL_EXPECTED_DTS"
@@ -31,4 +54,8 @@ if [ ! -f "$EXPECTED_DTS_PATH" ]; then
   exit 1
 fi
 
-echo "Kernel source ready: $(git -C "$KERNEL_DIR" rev-parse --short HEAD)"
+kernel_head="$(git -C "$KERNEL_DIR" rev-parse --short HEAD)"
+if ! git -C "$KERNEL_DIR" diff --quiet; then
+  kernel_head="${kernel_head}+local-patches"
+fi
+echo "Kernel source ready: $kernel_head"
