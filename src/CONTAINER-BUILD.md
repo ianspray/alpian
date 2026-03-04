@@ -32,12 +32,19 @@ From repo root:
 scripts/run-build-in-container.sh
 ```
 
+Build for ROCK5B:
+
+```bash
+BOARD=rock5b scripts/run-build-in-container.sh --runtime podman
+```
+
 This will:
 
 1. Build `e54c-builder:bookworm` from `Dockerfile.builder` if missing.
 2. Start a privileged container with the repo bind-mounted at `/workspace`.
 3. Run `make images` inside the container.
 4. Write artifacts to host `build/` through the bind mount.
+5. Use `BOARD` from the host environment (default: `e54c`).
 
 ## Common Commands
 
@@ -45,6 +52,12 @@ Build main image only:
 
 ```bash
 scripts/run-build-in-container.sh -- make main-image
+```
+
+Build ROCK5B main image only:
+
+```bash
+BOARD=rock5b scripts/run-build-in-container.sh --runtime podman -- make main-image
 ```
 
 Force rebuild of builder image:
@@ -65,6 +78,15 @@ Use a custom image tag:
 ```bash
 scripts/run-build-in-container.sh --image-tag e54c-builder:local
 ```
+
+Expected output image names:
+
+- E54C:
+  - `build/e54c-alpine-custom.img`
+  - `build/e54c-alpine-usb-updater.img`
+- ROCK5B:
+  - `build/rock5b-alpine-custom.img`
+  - `build/rock5b-alpine-usb-updater.img`
 
 ## Why Privileged Mode Is Required
 
@@ -91,6 +113,7 @@ Examples:
 
 ```bash
 sudo scripts/write-image-to-nvme.sh --image build/e54c-alpine-usb-updater.img --device /dev/sdX --yes
+sudo scripts/write-image-to-nvme.sh --image build/rock5b-alpine-usb-updater.img --device /dev/sdX --yes
 sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --yes
 ```
 
