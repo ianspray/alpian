@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# Maintainer: IWS <iws@toothless.local>
+pkgname=rock3b-partition-mount-service
+pkgver=0.1.0
+pkgrel=2
+pkgdesc="ROCK3B OpenRC NVMe Partition mounter"
+url="https://example.invalid/rock3b-alpine"
+arch="noarch"
+license="MIT"
+depends="openrc busybox"
+source="
+  rock3b-partition-mount.sh
+  rock3b-partition-mount.initd
+  rock3b-partition-mount.confd
+"
+builddir="$srcdir"
+options="!check"
+
+package() {
+  install -Dm755 "$srcdir"/rock3b-partition-mount.sh "$pkgdir"/usr/sbin/rock3b-partition-mount
+
+  install -Dm755 "$srcdir"/rock3b-partition-mount.initd "$pkgdir"/etc/init.d/rock3b-partition-mount
+  install -Dm644 "$srcdir"/rock3b-partition-mount.confd "$pkgdir"/etc/conf.d/rock3b-partition-mount
+}
+
+sha512sums="
+313788a94d9235e2005c0bf570d286cd8fc5bdba61ee8fecd83fffde4e3a405bbce0e81ce075615aa1970c87bcce8bf393ff5a42a8591306ee27edb78747431d  rock3b-partition-mount.sh
+3e58374a23476e7d8e946a1ed28735d5e3eb2a1fffe372364e6e80798e7da9f48d13853bb67d7658ee1dc933f3e2b66f43af504b81306d132e77980c96c540b3  rock3b-partition-mount.initd
+958a3101be68a9f8f207afb4f0bb56791be3156320b1925cc5becbdd4d1892532157df5d925dac3aef991d92a3aa75845d3c7b1a3bafa79ea193845ca50bd750  rock3b-partition-mount.confd
+"

@@ -38,6 +38,12 @@ Build for ROCK5B:
 BOARD=rock5b scripts/run-build-in-container.sh --runtime podman
 ```
 
+Build for ROCK3B:
+
+```bash
+BOARD=rock3b scripts/run-build-in-container.sh --runtime podman
+```
+
 Build for Raspberry Pi 4:
 
 ```bash
@@ -64,6 +70,12 @@ Build ROCK5B main image only:
 
 ```bash
 BOARD=rock5b scripts/run-build-in-container.sh --runtime podman -- make main-image
+```
+
+Build ROCK3B main image only:
+
+```bash
+BOARD=rock3b scripts/run-build-in-container.sh --runtime podman -- make main-image
 ```
 
 Build Raspberry Pi 4 main image only:
@@ -99,13 +111,16 @@ Expected output image names:
 - ROCK5B:
   - `build/rock5b-alpine-custom.img`
   - `build/rock5b-alpine-usb-updater.img`
+- ROCK3B:
+  - `build/rock3b-alpine-custom.img`
+  - `build/rock3b-alpine-usb-updater.img`
 - Raspberry Pi 4:
   - `build/rpi4-alpine-custom.img`
   - `build/rpi4-alpine-usb-updater.img`
 
 Notes by board:
 
-- `e54c`, `rock5b`: Rockchip flow with SPI U-Boot assets + extlinux boot entries.
+- `e54c`, `rock5b`, `rock3b`: Rockchip flow with SPI U-Boot assets + extlinux boot entries.
 - `rpi4`: Alpine Raspberry Pi prebuilt boot/kernel assets + Pi firmware boot (`config.txt`/`cmdline.txt`), no SPI U-Boot injection.
 
 ## Why Privileged Mode Is Required
@@ -134,6 +149,7 @@ Examples:
 ```bash
 sudo scripts/write-image-to-nvme.sh --image build/e54c-alpine-usb-updater.img --device /dev/sdX --yes
 sudo scripts/write-image-to-nvme.sh --image build/rock5b-alpine-usb-updater.img --device /dev/sdX --yes
+sudo scripts/write-image-to-nvme.sh --image build/rock3b-alpine-usb-updater.img --device /dev/sdX --yes
 sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --yes
 ```
 

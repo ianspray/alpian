@@ -16,6 +16,7 @@ Supported board profiles:
 
 - `e54c`
 - `rock5b`
+- `rock3b`
 - `rpi4`
 
 ```bash
@@ -32,6 +33,7 @@ Equivalent:
 ```bash
 make BOARD=e54c main-image
 make BOARD=rock5b main-image
+make BOARD=rock3b main-image
 make BOARD=rpi4 main-image
 ```
 
@@ -172,10 +174,13 @@ scripts/build-usb-updater-image.sh
 
 ## Notes
 
-- Kernel source defaults are aligned across boards (`e54c`, `rock5b`) to the same
+- Kernel source defaults are aligned across Radxa-source boards (`e54c`, `rock5b`, `rock3b`) to the same
   Radxa branch by default. Board differences should be kept in:
   - `boards/<board>/kernel/custom-kernel.fragment`
   - `boards/<board>/kernel/patches/*.patch` (only when required)
+
+- `rock3b` currently uses the Radxa RK3568 ROCK 3A DT naming in the BSP tree
+  (`rk3568-rock-3a.dtb`) as the default boot DTB.
 
 - `rpi4` uses Alpine's published Raspberry Pi image as the kernel/firmware/modules source
   (configured in `boards/rpi4/board.env`) and boots via Pi firmware

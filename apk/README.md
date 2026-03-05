@@ -7,7 +7,7 @@ This directory holds custom Alpine packages (APK) for board images.
 - `apk/aports/<namespace>/<package>/APKBUILD`
 - `apk/aports/<namespace>/<package>/*` package source files
 
-Current namespaces include `e54c`, `rock5b`, and `rpi4`.
+Current namespaces include `e54c`, `rock5b`, `rock3b`, and `rpi4`.
 
 ## Build All Packages
 
