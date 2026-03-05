@@ -18,9 +18,15 @@ ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
 HOST_ARCH="${HOST_ARCH:-$(uname -m)}"
 APK_CACHE_DIR="${APK_CACHE_DIR:-$REPO_ROOT/build/apk-cache}"
 ALPINE_PACKAGES="${ALPINE_PACKAGES:-}"
-ALPINE_PACKAGE_LIST_FILE="${ALPINE_PACKAGE_LIST_FILE:-${BOARD_ALPINE_PACKAGE_LIST_FILE:-$REPO_ROOT/assets/reference/alpine/packages.txt}}"
+ALPINE_PACKAGE_LIST_FILE="${ALPINE_PACKAGE_LIST_FILE:-}"
+ALPINE_PACKAGE_LIST_FILES="${ALPINE_PACKAGE_LIST_FILES:-}"
+COMMON_ALPINE_PACKAGE_LIST_FILE="${COMMON_ALPINE_PACKAGE_LIST_FILE:-$REPO_ROOT/boards/alpian/alpine/packages.txt}"
+BOARD_ALPINE_PACKAGE_LIST_FILE="${BOARD_ALPINE_PACKAGE_LIST_FILE:-}"
 CUSTOM_APK_REPOSITORIES_FILE="${CUSTOM_APK_REPOSITORIES_FILE:-$REPO_ROOT/assets/reference/alpine/custom-repositories.txt}"
-CUSTOM_APK_PACKAGES_FILE="${CUSTOM_APK_PACKAGES_FILE:-${BOARD_CUSTOM_APK_PACKAGES_FILE:-$REPO_ROOT/assets/reference/alpine/custom-packages.txt}}"
+CUSTOM_APK_PACKAGES_FILE="${CUSTOM_APK_PACKAGES_FILE:-}"
+CUSTOM_APK_PACKAGES_FILES="${CUSTOM_APK_PACKAGES_FILES:-}"
+COMMON_CUSTOM_APK_PACKAGES_FILE="${COMMON_CUSTOM_APK_PACKAGES_FILE:-$REPO_ROOT/boards/alpian/alpine/custom-packages.txt}"
+BOARD_CUSTOM_APK_PACKAGES_FILE="${BOARD_CUSTOM_APK_PACKAGES_FILE:-}"
 CUSTOM_APK_KEYS_DIR="${CUSTOM_APK_KEYS_DIR:-$REPO_ROOT/assets/reference/alpine/custom-keys}"
 LOCAL_CUSTOM_APK_REPO_DIR="${LOCAL_CUSTOM_APK_REPO_DIR:-$REPO_ROOT/build/apk-repo/$ALPINE_BRANCH}"
 LOCAL_CUSTOM_APK_KEYS_DIR="${LOCAL_CUSTOM_APK_KEYS_DIR:-$REPO_ROOT/build/apk-repo/keys}"
@@ -40,7 +46,7 @@ BOOT_NTP_SERVERS="${BOOT_NTP_SERVERS:-pool.ntp.org time.cloudflare.com time.goog
 FORCE_BOARD_MODULES="${FORCE_BOARD_MODULES:-${E54C_FORCE_DSA_MODULES:-1}}"
 BOARD_ALPINE_INTERFACES_FILE="${BOARD_ALPINE_INTERFACES_FILE:-}"
 BOARD_ALPINE_MODULES_FILE="${BOARD_ALPINE_MODULES_FILE:-}"
-BOARD_BOOT_SERVICES="${BOARD_BOOT_SERVICES:-${BOARD}-dev-perms ${BOARD}-bootmode-oneshot ${BOARD}-partition-mount}"
+BOARD_BOOT_SERVICES="${BOARD_BOOT_SERVICES:-${BOARD}-dev-perms ${BOARD}-bootmode-oneshot partition-mount}"
 BOARD_IMMUTABLE_ROOT_SERVICE="${BOARD_IMMUTABLE_ROOT_SERVICE:-${BOARD}-root-mode}"
 NET_BANNER_SERVICE_NAME="${NET_BANNER_SERVICE_NAME:-${BOARD_NET_BANNER_SERVICE_NAME:-show-net-addrs}}"
 BOOT_NTP_SERVICE_NAME="${BOOT_NTP_SERVICE_NAME:-${BOARD_BOOT_NTP_SERVICE_NAME:-${BOARD}-ntp-sync}}"
@@ -54,6 +60,8 @@ ROOTFS_TAR="${ROOTFS_TAR:-$REPO_ROOT/build/alpine-rootfs.tar}"
 ROOTFS_FALLBACK_ON_EXTRACT_FAILURE="${ROOTFS_FALLBACK_ON_EXTRACT_FAILURE:-1}"
 ROOTFS_FALLBACK_DIR="${ROOTFS_FALLBACK_DIR:-/tmp/${BOARD}-alpine-rootfs}"
 DEFAULT_ROOT_AUTHORIZED_KEYS_FILE="$REPO_ROOT/assets/reference/alpine/root_authorized_keys"
+LEGACY_COMMON_ALPINE_PACKAGE_LIST_FILE="$REPO_ROOT/assets/reference/alpine/packages.txt"
+LEGACY_COMMON_CUSTOM_APK_PACKAGES_FILE="$REPO_ROOT/assets/reference/alpine/custom-packages.txt"
 
 # In containerized macOS workflows, bind-mounted /workspace can reject
 # extraction/deletion of many rootfs files. Prefer a container-local path.
@@ -67,6 +75,13 @@ if [ "$ROOT_AUTHORIZED_KEYS_FILE" = "__AUTO__" ]; then
   else
     ROOT_AUTHORIZED_KEYS_FILE=""
   fi
+fi
+
+if [ ! -f "$COMMON_ALPINE_PACKAGE_LIST_FILE" ] && [ -f "$LEGACY_COMMON_ALPINE_PACKAGE_LIST_FILE" ]; then
+  COMMON_ALPINE_PACKAGE_LIST_FILE="$LEGACY_COMMON_ALPINE_PACKAGE_LIST_FILE"
+fi
+if [ ! -f "$COMMON_CUSTOM_APK_PACKAGES_FILE" ] && [ -f "$LEGACY_COMMON_CUSTOM_APK_PACKAGES_FILE" ]; then
+  COMMON_CUSTOM_APK_PACKAGES_FILE="$LEGACY_COMMON_CUSTOM_APK_PACKAGES_FILE"
 fi
 
 mkdir -p "$DOWNLOAD_DIR" "$ROOTFS_DIR" "$APK_CACHE_DIR"
@@ -199,20 +214,62 @@ read_package_file() {
   done <"$package_file"
 }
 
+package_file_has_entries() {
+  local package_file="$1"
+  [ -f "$package_file" ] || return 1
+  grep -Eq '^[[:space:]]*[^#[:space:]]' "$package_file"
+}
+
+package_list_files=()
+if [ -n "$ALPINE_PACKAGE_LIST_FILES" ]; then
+  read -r -a package_list_files <<<"$ALPINE_PACKAGE_LIST_FILES"
+elif [ -n "$ALPINE_PACKAGE_LIST_FILE" ]; then
+  package_list_files=("$ALPINE_PACKAGE_LIST_FILE")
+else
+  package_list_files=("$COMMON_ALPINE_PACKAGE_LIST_FILE")
+  if [ -n "$BOARD_ALPINE_PACKAGE_LIST_FILE" ]; then
+    package_list_files+=("$BOARD_ALPINE_PACKAGE_LIST_FILE")
+  fi
+fi
+
+custom_package_files=()
+if [ -n "$CUSTOM_APK_PACKAGES_FILES" ]; then
+  read -r -a custom_package_files <<<"$CUSTOM_APK_PACKAGES_FILES"
+elif [ -n "$CUSTOM_APK_PACKAGES_FILE" ]; then
+  custom_package_files=("$CUSTOM_APK_PACKAGES_FILE")
+else
+  custom_package_files=("$COMMON_CUSTOM_APK_PACKAGES_FILE")
+  if [ -n "$BOARD_CUSTOM_APK_PACKAGES_FILE" ]; then
+    custom_package_files+=("$BOARD_CUSTOM_APK_PACKAGES_FILE")
+  fi
+fi
+
 if [ -n "$ALPINE_PACKAGES" ]; then
   read -r -a _user_package_args <<<"$ALPINE_PACKAGES"
   for pkg in "${_user_package_args[@]}"; do
     append_pkg_unique "$pkg"
   done
-elif [ -f "$ALPINE_PACKAGE_LIST_FILE" ]; then
-  read_package_file "$ALPINE_PACKAGE_LIST_FILE"
+else
+  for package_file in "${package_list_files[@]}"; do
+    read_package_file "$package_file"
+  done
 fi
 
 if [ "$custom_repo_count" -gt 0 ]; then
-  read_package_file "$CUSTOM_APK_PACKAGES_FILE"
-elif [ -f "$CUSTOM_APK_PACKAGES_FILE" ]; then
-  if grep -Eq '^[[:space:]]*[^#[:space:]]' "$CUSTOM_APK_PACKAGES_FILE"; then
-    echo "Custom packages are configured in $CUSTOM_APK_PACKAGES_FILE but no custom APK repository is available." >&2
+  for package_file in "${custom_package_files[@]}"; do
+    read_package_file "$package_file"
+  done
+else
+  configured_custom_package_files=()
+  for package_file in "${custom_package_files[@]}"; do
+    if package_file_has_entries "$package_file"; then
+      configured_custom_package_files+=("$package_file")
+    fi
+  done
+  if [ "${#configured_custom_package_files[@]}" -gt 0 ]; then
+    echo "Custom packages are configured in:" >&2
+    printf '  - %s\n' "${configured_custom_package_files[@]}" >&2
+    echo "but no custom APK repository is available." >&2
     echo "Run scripts/build-apk-repo.sh first, or configure CUSTOM_APK_REPOSITORIES_FILE." >&2
     exit 1
   fi

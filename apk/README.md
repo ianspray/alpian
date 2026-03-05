@@ -37,8 +37,9 @@ http://<host>:8080/v3.23
 ## Include in Image Builds
 
 1. Add repository URL to `assets/reference/alpine/custom-repositories.txt`.
-2. Add custom package names to `assets/reference/alpine/custom-packages.txt`.
-3. Rebuild:
+2. Add shared custom package names to `boards/alpian/alpine/custom-packages.txt`.
+3. Add board-specific custom package names to `boards/<board>/alpine/custom-packages.txt` when needed.
+4. Rebuild:
 
 ```bash
 scripts/prepare-alpian-rootfs.sh
@@ -48,7 +49,8 @@ scripts/assemble-image.sh
 `prepare-alpian-rootfs.sh` now reads:
 
 - `assets/reference/alpine/custom-repositories.txt`
-- `assets/reference/alpine/custom-packages.txt`
+- `boards/alpian/alpine/custom-packages.txt`
+- `boards/<board>/alpine/custom-packages.txt`
 - `assets/reference/alpine/custom-keys/*.pub`
 - local repository `build/apk-repo/v3.23` automatically (when present)
 - local keys from `build/apk-repo/keys` automatically (when present)

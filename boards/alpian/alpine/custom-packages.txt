@@ -1,0 +1,4 @@
+# Shared package names from custom repositories.
+# One package per line. Comment lines are ignored.
+#
+partition-mount-service

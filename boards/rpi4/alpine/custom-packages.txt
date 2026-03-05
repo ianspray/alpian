@@ -1,5 +1,5 @@
-# Optional package names from custom repositories.
-# One package per line. Comment lines are ignored.
+# Board-specific custom package overlay for Raspberry Pi 4.
+# These entries are appended after boards/alpian/alpine/custom-packages.txt.
 #
 rpi4-openrc-services
 rpi4-usb-updater-services

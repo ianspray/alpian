@@ -122,7 +122,8 @@ Repository tooling available in this project:
 4. Add repo URL(s) to:
    - `assets/reference/alpine/custom-repositories.txt`
 5. Add package names to:
-   - `assets/reference/alpine/custom-packages.txt`
+   - `boards/alpian/alpine/custom-packages.txt`
+   - `boards/<board>/alpine/custom-packages.txt` for board-specific overlays
 6. Rebuild image:
    - `scripts/prepare-alpian-rootfs.sh`
    - `scripts/assemble-image.sh`
@@ -133,8 +134,9 @@ If a local repo exists at `build/apk-repo/v3.23`, `prepare-alpian-rootfs.sh` aut
 
 For packages known to be required at runtime:
 
-1. Add package names to `assets/reference/alpine/packages.txt`.
-2. Rebuild:
+1. Add package names to `boards/alpian/alpine/packages.txt` for shared packages.
+2. Add board-only package names to `boards/<board>/alpine/packages.txt`.
+3. Rebuild:
    - `scripts/prepare-alpian-rootfs.sh`
    - `scripts/assemble-image.sh`
 
@@ -156,7 +158,7 @@ For ad-hoc runtime packages:
 If package count grows:
 
 1. Keep a dedicated custom repository (signed) and pin versions.
-2. Keep `assets/reference/alpine/packages.txt` as your baseline world policy.
+2. Keep `boards/alpian/alpine/packages.txt` as your shared baseline world policy.
 3. Avoid storing large package payload in apkovl.
 4. Keep `lbu` focused on config and small state.
 5. Increase persistent cache/storage as needed (config partition is currently 256 MiB).

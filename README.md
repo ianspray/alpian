@@ -15,7 +15,8 @@ For full build/run details, see `src/README.md`.
 - `boards/`
   - Board-specific profiles and overrides. Use `BOARD=<name>` for builds (default: `e54c`).
   - Supported board profiles: `e54c`, `rock5b`, `rock3b`, `rpi4`.
-  - Includes board-local Alpine package lists (`boards/<board>/alpine/packages.txt`) and
+  - Includes shared Alpine package lists in `boards/alpian/alpine/` plus board overlay lists in
+    `boards/<board>/alpine/`, and
     U-Boot fetch profiles (`boards/<board>/u-boot-fetch.env`).
 - `apk/`
   - Custom Alpine APK package sources (`APKBUILD` + service payload files).

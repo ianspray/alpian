@@ -1,5 +1,6 @@
-# Optional package names from custom repositories.
-# One package per line. Comment lines are ignored.
+# Board-specific custom package overlay for E54C.
+# These entries are appended after boards/alpian/alpine/custom-packages.txt.
 #
+e54c-openrc-sample
 e54c-openrc-services
 e54c-usb-updater-services

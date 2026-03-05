@@ -1,0 +1,30 @@
+# SPDX-License-Identifier: MIT
+# Maintainer: IWS <iws@toothless.local>
+pkgname=partition-mount-service
+pkgver=0.1.0
+pkgrel=3
+pkgdesc="Alpian OpenRC NVMe Partition mounter"
+url="https://example.invalid/alpian"
+arch="noarch"
+license="MIT"
+depends="openrc busybox"
+source="
+  partition-mount.sh
+  partition-mount.initd
+  partition-mount.confd
+"
+builddir="$srcdir"
+options="!check"
+
+package() {
+  install -Dm755 "$srcdir"/partition-mount.sh "$pkgdir"/usr/sbin/partition-mount
+
+  install -Dm755 "$srcdir"/partition-mount.initd "$pkgdir"/etc/init.d/partition-mount
+  install -Dm644 "$srcdir"/partition-mount.confd "$pkgdir"/etc/conf.d/partition-mount
+}
+
+sha512sums="
+958a3101be68a9f8f207afb4f0bb56791be3156320b1925cc5becbdd4d1892532157df5d925dac3aef991d92a3aa75845d3c7b1a3bafa79ea193845ca50bd750  partition-mount.confd
+33d0e3c22347887cd16d75927dd93daba8378de78ab18c693489ab1e582b3556e7ed09164f0318477c13e7e151a417b3f1e934457a1f652ab9caeab189760c18  partition-mount.initd
+b73393456860f78d09cac4345a2e813452ec2954aae4b61b41f7b39c96217a869cdcdffc53fb0663d2c96c4d8160383605aeb99b1c1c4c8702d88b7443da6adf  partition-mount.sh
+"

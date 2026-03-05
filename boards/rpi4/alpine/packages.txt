@@ -1,22 +1,5 @@
-# Alpine packages pre-installed into the image rootfs.
-# One package per line.
+# Board-specific package overlay for Raspberry Pi 4.
+# These entries are appended after boards/alpian/alpine/packages.txt.
 
-alpine-base
-alpine-conf
-openssh
-mtd-utils
-dosfstools
-e2fsprogs
-lsblk
-inotify-tools
-avahi
-vim
-curl
-file
-jq
-cfdisk
-tree
-caddy
 rpi4-openrc-services
-rpi4-partition-mount-service
 rpi4-usb-updater-services

@@ -1,22 +1,5 @@
-# Alpine packages pre-installed into the image rootfs.
-# One package per line.
+# Board-specific package overlay for ROCK 3B.
+# These entries are appended after boards/alpian/alpine/packages.txt.
 
-alpine-base
-alpine-conf
-openssh
-mtd-utils
-dosfstools
-e2fsprogs
-lsblk
-inotify-tools
-avahi
-vim
-curl
-file
-jq
-cfdisk
-tree
-caddy
 rock3b-openrc-services
-rock3b-partition-mount-service
 rock3b-usb-updater-services

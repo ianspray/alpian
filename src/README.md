@@ -139,8 +139,10 @@ All scripts in `scripts/` and their primary purpose:
   - Build or fetch kernel image, modules, and DTBs for the selected board profile.
 - `scripts/prepare-alpian-rootfs.sh`
   - Build and configure Alpine rootfs content.
-  - Uses board package defaults from `boards/<board>/alpine/packages.txt` and
-    board custom package defaults from `boards/<board>/alpine/custom-packages.txt`.
+  - Uses shared package defaults from `boards/alpian/alpine/packages.txt`, board overlays from
+    `boards/<board>/alpine/packages.txt`, shared custom package defaults from
+    `boards/alpian/alpine/custom-packages.txt`, and board custom package overlays from
+    `boards/<board>/alpine/custom-packages.txt`.
 - `scripts/assemble-image.sh`
   - Assemble final main NVMe image from build artifacts.
 - `scripts/build-usb-updater-image.sh`
@@ -231,12 +233,14 @@ scripts/build-usb-updater-image.sh
 - Override serial device/baud:
   - `SERIAL_TTY=ttyS2 SERIAL_BAUD=1500000 scripts/prepare-alpian-rootfs.sh`
 - Override default package set:
-  - Edit `assets/reference/alpine/packages.txt` (one package per line)
+  - Edit `boards/alpian/alpine/packages.txt` for common packages
+  - Edit `boards/<board>/alpine/packages.txt` for board-specific overlays
   - or override ad hoc with `ALPINE_PACKAGES="alpine-base alpine-conf openssh curl" scripts/prepare-alpian-rootfs.sh`
 - Add custom package repositories for image builds/runtime:
   - Edit `assets/reference/alpine/custom-repositories.txt`
 - Add custom package names from those repositories:
-  - Edit `assets/reference/alpine/custom-packages.txt`
+  - Edit `boards/alpian/alpine/custom-packages.txt` for shared custom packages
+  - Edit `boards/<board>/alpine/custom-packages.txt` for board-specific custom packages
 - Add custom APK signing keys used by those repositories:
   - Place `.rsa.pub` key files in `assets/reference/alpine/custom-keys/`
   - Or build locally with `scripts/build-apk-repo.sh` (Podman) and use the auto-detected local repo in `build/apk-repo/v3.23`

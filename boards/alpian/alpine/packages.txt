@@ -1,4 +1,4 @@
-# Alpine packages pre-installed into the image rootfs.
+# Alpine packages pre-installed into every image rootfs.
 # One package per line.
 
 alpine-base
@@ -17,7 +17,4 @@ jq
 cfdisk
 tree
 caddy
-e54c-openrc-sample
-e54c-openrc-services
 partition-mount-service
-e54c-usb-updater-services

@@ -117,11 +117,19 @@ $(ROOTFS_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	    $(BOARD_DIR)/board.env \
 	    scripts/prepare-alpian-rootfs.sh \
 	    scripts/check-tooling.sh \
-	    assets/reference/alpine/packages.txt \
-	    assets/reference/alpine/custom-packages.txt \
 	    assets/reference/alpine/custom-repositories.txt \
 	    assets/reference/alpine/motd-main \
 	    assets/reference/alpine/motd-updater; \
+	  if [ -f "boards/alpian/alpine/packages.txt" ]; then \
+	    printf '%s\0' "boards/alpian/alpine/packages.txt"; \
+	  elif [ -f "assets/reference/alpine/packages.txt" ]; then \
+	    printf '%s\0' "assets/reference/alpine/packages.txt"; \
+	  fi; \
+	  if [ -f "boards/alpian/alpine/custom-packages.txt" ]; then \
+	    printf '%s\0' "boards/alpian/alpine/custom-packages.txt"; \
+	  elif [ -f "assets/reference/alpine/custom-packages.txt" ]; then \
+	    printf '%s\0' "assets/reference/alpine/custom-packages.txt"; \
+	  fi; \
 	  if [ -f "$(BOARD_DIR)/alpine/interfaces" ]; then \
 	    printf '%s\0' "$(BOARD_DIR)/alpine/interfaces"; \
 	  fi; \

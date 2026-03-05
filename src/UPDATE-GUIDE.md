@@ -51,7 +51,7 @@ scripts/assemble-image.sh
 Sustainability notes:
 
 1. Always set `ALPINE_BRANCH` and `ALPINE_VERSION` explicitly in CI/release jobs.
-2. Keep baseline packages in `assets/reference/alpine/packages.txt` small and intentional.
+2. Keep shared baseline packages in `boards/alpian/alpine/packages.txt` small and intentional.
 3. Use `ALPINE_PACKAGES` only for one-off overrides in automated jobs.
 4. Keep build-time temporary credentials controllable with env vars:
    - `ROOT_PASSWORD_HASH`

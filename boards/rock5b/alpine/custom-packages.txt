@@ -1,5 +1,5 @@
-# Optional package names from custom repositories.
-# One package per line. Comment lines are ignored.
+# Board-specific custom package overlay for ROCK 5B.
+# These entries are appended after boards/alpian/alpine/custom-packages.txt.
 #
 rock5b-openrc-services
 rock5b-usb-updater-services

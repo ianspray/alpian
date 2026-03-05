@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 set -eu
 
-CONF_FILE="/etc/conf.d/e54c-partition-mount"
+CONF_FILE="/etc/conf.d/partition-mount"
 [ -f "$CONF_FILE" ] || exit 0
 
 check_hardware_path="$(awk -F= '/^[[:space:]]*check_hardware_path[[:space:]]*=/{gsub(/[[:space:]]|"/,"",$2); print $2; exit}' "$CONF_FILE" 2>/dev/null || true)"
