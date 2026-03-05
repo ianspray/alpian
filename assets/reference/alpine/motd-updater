@@ -1,4 +1,4 @@
-E54C Alpine USB Updater Image
+Alpian USB Updater Image
 
 Role: update media (not the normal runtime image)
 Action: flashes bundled NVMe image and reboots

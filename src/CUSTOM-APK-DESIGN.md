@@ -124,10 +124,10 @@ Repository tooling available in this project:
 5. Add package names to:
    - `assets/reference/alpine/custom-packages.txt`
 6. Rebuild image:
-   - `scripts/prepare-alpine-rootfs.sh`
+   - `scripts/prepare-alpian-rootfs.sh`
    - `scripts/assemble-image.sh`
 
-If a local repo exists at `build/apk-repo/v3.23`, `prepare-alpine-rootfs.sh` auto-adds it and auto-imports keys from `build/apk-repo/keys`.
+If a local repo exists at `build/apk-repo/v3.23`, `prepare-alpian-rootfs.sh` auto-adds it and auto-imports keys from `build/apk-repo/keys`.
 
 ## Integrating with This Repo
 
@@ -135,7 +135,7 @@ For packages known to be required at runtime:
 
 1. Add package names to `assets/reference/alpine/packages.txt`.
 2. Rebuild:
-   - `scripts/prepare-alpine-rootfs.sh`
+   - `scripts/prepare-alpian-rootfs.sh`
    - `scripts/assemble-image.sh`
 
 This keeps runtime `lbu` data small because package payload is in the base image.

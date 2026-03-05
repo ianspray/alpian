@@ -5,7 +5,7 @@ This document defines a sustainable update model for this repository and device.
 ## Current Build Model
 
 1. Kernel, DTB, and modules are built by `scripts/build-kernel.sh`.
-2. Alpine userland rootfs is built by `scripts/prepare-alpine-rootfs.sh`.
+2. Alpine userland rootfs is built by `scripts/prepare-alpian-rootfs.sh`.
 3. Final image is assembled by `scripts/assemble-image.sh`.
 4. Final image is flashed by `scripts/write-image-to-nvme.sh`.
 
@@ -38,7 +38,7 @@ Recommended process:
 2. Rebuild rootfs and image with explicit env vars:
 
 ```bash
-ALPINE_BRANCH=v3.24 ALPINE_VERSION=3.24.0 scripts/prepare-alpine-rootfs.sh
+ALPINE_BRANCH=v3.24 ALPINE_VERSION=3.24.0 scripts/prepare-alpian-rootfs.sh
 scripts/assemble-image.sh
 ```
 
@@ -81,7 +81,7 @@ KERNEL_BRANCH=linux-6.6-some-branch scripts/build-kernel.sh
 3. Rebuild rootfs + image to include matching modules and boot artifacts:
 
 ```bash
-scripts/prepare-alpine-rootfs.sh
+scripts/prepare-alpian-rootfs.sh
 scripts/assemble-image.sh
 ```
 
@@ -263,13 +263,13 @@ scripts/build-usb-updater-image.sh
 Write updater image to USB media:
 
 ```bash
-sudo scripts/write-image-to-nvme.sh --image build/e54c-alpine-usb-updater.img --device /dev/sdX --yes
+sudo scripts/write-image-to-nvme.sh --image build/e54c-alpian-usb-updater.img --device /dev/sdX --yes
 ```
 
 Default artifacts:
 
-1. Source NVMe image payload: `build/e54c-alpine-custom.img`
-2. USB updater image: `build/e54c-alpine-usb-updater.img`
+1. Source NVMe image payload: `build/e54c-alpian-custom.img`
+2. USB updater image: `build/e54c-alpian-usb-updater.img`
 
 ### Device Boot Prerequisite
 

@@ -106,17 +106,17 @@ scripts/run-build-in-container.sh --image-tag radxa-builder:local
 Expected output image names:
 
 - E54C:
-  - `build/e54c-alpine-custom.img`
-  - `build/e54c-alpine-usb-updater.img`
+  - `build/e54c-alpian-custom.img`
+  - `build/e54c-alpian-usb-updater.img`
 - ROCK5B:
-  - `build/rock5b-alpine-custom.img`
-  - `build/rock5b-alpine-usb-updater.img`
+  - `build/rock5b-alpian-custom.img`
+  - `build/rock5b-alpian-usb-updater.img`
 - ROCK3B:
-  - `build/rock3b-alpine-custom.img`
-  - `build/rock3b-alpine-usb-updater.img`
+  - `build/rock3b-alpian-custom.img`
+  - `build/rock3b-alpian-usb-updater.img`
 - Raspberry Pi 4:
-  - `build/rpi4-alpine-custom.img`
-  - `build/rpi4-alpine-usb-updater.img`
+  - `build/rpi4-alpian-custom.img`
+  - `build/rpi4-alpian-usb-updater.img`
 
 Notes by board:
 
@@ -147,9 +147,9 @@ Flashing images to USB or NVMe is intentionally excluded from this container wor
 Examples:
 
 ```bash
-sudo scripts/write-image-to-nvme.sh --image build/e54c-alpine-usb-updater.img --device /dev/sdX --yes
-sudo scripts/write-image-to-nvme.sh --image build/rock5b-alpine-usb-updater.img --device /dev/sdX --yes
-sudo scripts/write-image-to-nvme.sh --image build/rock3b-alpine-usb-updater.img --device /dev/sdX --yes
+sudo scripts/write-image-to-nvme.sh --image build/e54c-alpian-usb-updater.img --device /dev/sdX --yes
+sudo scripts/write-image-to-nvme.sh --image build/rock5b-alpian-usb-updater.img --device /dev/sdX --yes
+sudo scripts/write-image-to-nvme.sh --image build/rock3b-alpian-usb-updater.img --device /dev/sdX --yes
 sudo scripts/write-image-to-nvme.sh --device /dev/nvme0n1 --yes
 ```
 

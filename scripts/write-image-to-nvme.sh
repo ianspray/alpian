@@ -8,7 +8,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 BOARD="${BOARD:-e54c}"
 
-IMAGE_PATH="$REPO_ROOT/build/${BOARD}-alpine-custom.img"
+IMAGE_PATH="${IMAGE_PATH:-$REPO_ROOT/build/${BOARD}-alpian-custom.img}"
 TARGET_DEVICE=""
 ASSUME_YES=0
 AUTO_UNMOUNT=0

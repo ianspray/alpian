@@ -1,4 +1,6 @@
-# e54c-alpine
+# alpian
+
+![alpian logo](alpian.png "alpian logo")
 
 Top-level orientation for the repository and cleanup behavior.
 
@@ -33,7 +35,7 @@ For full build/run details, see `src/README.md`.
 These can be removed and will be recreated by scripts when needed.
 
 - `build/`
-  - Recreated by all build scripts (`scripts/build-*.sh`, `scripts/prepare-alpine-rootfs.sh`, `scripts/assemble-image.sh`).
+  - Recreated by all build scripts (`scripts/build-*.sh`, `scripts/prepare-alpian-rootfs.sh`, `scripts/assemble-image.sh`).
   - Contains outputs like kernel artifacts, rootfs tarball, image files, APK repo, U-Boot build trees.
 - `src/radxa-kernel-<board>/`
   - Recreated by `scripts/fetch-radxa-kernel.sh` (called by `scripts/build-kernel.sh`) for Radxa-source boards.
@@ -64,7 +66,7 @@ BOARD=e54c scripts/check-tooling.sh
 BOARD=e54c scripts/fetch-uboot-reference-assets.sh
 BOARD=e54c scripts/build-apk-repo.sh
 BOARD=e54c scripts/build-kernel.sh
-BOARD=e54c scripts/prepare-alpine-rootfs.sh
+BOARD=e54c scripts/prepare-alpian-rootfs.sh
 BOARD=e54c scripts/assemble-image.sh
 BOARD=e54c scripts/build-usb-updater-image.sh
 ```
@@ -78,14 +80,14 @@ make BOARD=rock3b images
 make BOARD=rpi4 images
 ```
 
-Legacy explicit sequence (still valid):
+Explicit sequence:
 
 ```bash
 scripts/check-tooling.sh
 scripts/fetch-uboot-reference-assets.sh
 scripts/build-apk-repo.sh
 scripts/build-kernel.sh
-scripts/prepare-alpine-rootfs.sh
+scripts/prepare-alpian-rootfs.sh
 scripts/assemble-image.sh
 scripts/build-usb-updater-image.sh
 ```

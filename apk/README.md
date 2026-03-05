@@ -41,11 +41,11 @@ http://<host>:8080/v3.23
 3. Rebuild:
 
 ```bash
-scripts/prepare-alpine-rootfs.sh
+scripts/prepare-alpian-rootfs.sh
 scripts/assemble-image.sh
 ```
 
-`prepare-alpine-rootfs.sh` now reads:
+`prepare-alpian-rootfs.sh` now reads:
 
 - `assets/reference/alpine/custom-repositories.txt`
 - `assets/reference/alpine/custom-packages.txt`

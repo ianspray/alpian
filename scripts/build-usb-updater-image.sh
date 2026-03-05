@@ -19,8 +19,8 @@ UPDATER_PAYLOAD_FILE_WAS_SET="${UPDATER_PAYLOAD_FILE+x}"
 UPDATER_PAYLOAD_SHA256_WAS_SET="${UPDATER_PAYLOAD_SHA256+x}"
 UPDATER_GUESTFS_TMPDIR_WAS_SET="${UPDATER_GUESTFS_TMPDIR+x}"
 
-NVME_IMAGE_PATH="${NVME_IMAGE_PATH:-$REPO_ROOT/build/${BOARD}-alpine-custom.img}"
-USB_UPDATER_IMAGE_PATH="${USB_UPDATER_IMAGE_PATH:-$REPO_ROOT/build/${BOARD}-alpine-usb-updater.img}"
+NVME_IMAGE_PATH="${NVME_IMAGE_PATH:-$REPO_ROOT/build/${BOARD}-alpian-custom.img}"
+USB_UPDATER_IMAGE_PATH="${USB_UPDATER_IMAGE_PATH:-$REPO_ROOT/build/${BOARD}-alpian-usb-updater.img}"
 UPDATER_WORK_DIR="${UPDATER_WORK_DIR:-$REPO_ROOT/build/usb-updater}"
 UPDATER_ROOTFS_DIR="${UPDATER_ROOTFS_DIR:-$UPDATER_WORK_DIR/rootfs}"
 UPDATER_ROOTFS_TAR="${UPDATER_ROOTFS_TAR:-$UPDATER_WORK_DIR/rootfs.tar}"
@@ -108,7 +108,7 @@ export LIBGUESTFS_CACHEDIR="$UPDATER_GUESTFS_TMPDIR"
 export LIBGUESTFS_BACKEND_SETTINGS="${LIBGUESTFS_BACKEND_SETTINGS:-force_tcg}"
 export LIBGUESTFS_MEMSIZE="${LIBGUESTFS_MEMSIZE:-1024}"
 
-echo "Preparing updater Alpine rootfs..."
+echo "Preparing updater rootfs..."
 ROOTFS_DIR="$UPDATER_ROOTFS_DIR" \
 ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \
 ROOTFS_FALLBACK_DIR="/tmp/${BOARD}-usb-updater-rootfs" \
@@ -116,7 +116,7 @@ ALPINE_PACKAGES="$UPDATER_ALPINE_PACKAGES" \
 ENABLE_BOOT_NET_BANNER=1 \
 BOOT_BANNER_TITLE="${BOARD_DISPLAY_NAME} USB updater image" \
 MOTD_TEMPLATE_FILE="$REPO_ROOT/assets/reference/alpine/motd-updater" \
-"$SCRIPT_DIR/prepare-alpine-rootfs.sh"
+"$SCRIPT_DIR/prepare-alpian-rootfs.sh"
 
 # Updater image must be able to persistently edit its own boot entries.
 # Keep root writable fallback if overlaytmpfs is not active.
@@ -199,7 +199,7 @@ PROMPT 1
 TIMEOUT 10
 
 LABEL updater
-  MENU LABEL Alpine Linux USB updater (flash NVMe and reboot)
+  MENU LABEL Alpian USB updater (flash NVMe and reboot)
   LINUX /boot/Image
   INITRD /boot/${UPDATER_INITRAMFS_NAME}
   FDT /boot/dtbs/${BOARD_DTB_SUBDIR}/${UPDATER_DTB_NAME}

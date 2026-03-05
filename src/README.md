@@ -24,7 +24,7 @@ BOARD=e54c scripts/check-tooling.sh
 BOARD=e54c scripts/fetch-uboot-reference-assets.sh
 BOARD=e54c scripts/build-apk-repo.sh
 BOARD=e54c scripts/build-kernel.sh
-BOARD=e54c scripts/prepare-alpine-rootfs.sh
+BOARD=e54c scripts/prepare-alpian-rootfs.sh
 BOARD=e54c scripts/assemble-image.sh
 ```
 
@@ -102,7 +102,7 @@ sudo flashcp -v build/u-boot-artifacts/<stamp>/spi-u-boot-16MiB.img /dev/mtd0
 Write USB updater image to a USB stick:
 
 ```bash
-sudo BOARD=e54c scripts/write-image-to-nvme.sh --image build/e54c-alpine-usb-updater.img --device /dev/sdX --yes
+sudo BOARD=e54c scripts/write-image-to-nvme.sh --image build/e54c-alpian-usb-updater.img --device /dev/sdX --yes
 ```
 
 Flash the generated image to NVMe:
@@ -137,7 +137,7 @@ All scripts in `scripts/` and their primary purpose:
   - Applies optional board-local patches from `boards/<board>/kernel/patches/*.patch`.
 - `scripts/build-kernel.sh`
   - Build or fetch kernel image, modules, and DTBs for the selected board profile.
-- `scripts/prepare-alpine-rootfs.sh`
+- `scripts/prepare-alpian-rootfs.sh`
   - Build and configure Alpine rootfs content.
   - Uses board package defaults from `boards/<board>/alpine/packages.txt` and
     board custom package defaults from `boards/<board>/alpine/custom-packages.txt`.
@@ -167,7 +167,7 @@ scripts/check-tooling.sh
 scripts/fetch-uboot-reference-assets.sh
 scripts/build-apk-repo.sh
 scripts/build-kernel.sh
-scripts/prepare-alpine-rootfs.sh
+scripts/prepare-alpian-rootfs.sh
 scripts/assemble-image.sh
 scripts/build-usb-updater-image.sh
 ```
@@ -198,7 +198,7 @@ scripts/build-usb-updater-image.sh
   - `p2` `efi` FAT32, size `300 MiB`
   - `p3` `rootfs` ext4 uses remainder
 - USB updater image details:
-  - Includes compressed payload derived from `build/<board>-alpine-custom.img`
+  - Includes compressed payload derived from `build/<board>-alpian-custom.img`
   - Boots a true diskless updater profile from USB (`diskless=yes` via initramfs)
   - Auto-runs `e54c-usb-nvme-update` service to flash `/dev/nvme0n1`
   - Disables USB boot entries on both EFI (`/extlinux/extlinux.conf`) and rootfs (`/boot/extlinux/extlinux.conf`) after successful flash
@@ -229,10 +229,10 @@ scripts/build-usb-updater-image.sh
 ## Customization
 
 - Override serial device/baud:
-  - `SERIAL_TTY=ttyS2 SERIAL_BAUD=1500000 scripts/prepare-alpine-rootfs.sh`
+  - `SERIAL_TTY=ttyS2 SERIAL_BAUD=1500000 scripts/prepare-alpian-rootfs.sh`
 - Override default package set:
   - Edit `assets/reference/alpine/packages.txt` (one package per line)
-  - or override ad hoc with `ALPINE_PACKAGES="alpine-base alpine-conf openssh curl" scripts/prepare-alpine-rootfs.sh`
+  - or override ad hoc with `ALPINE_PACKAGES="alpine-base alpine-conf openssh curl" scripts/prepare-alpian-rootfs.sh`
 - Add custom package repositories for image builds/runtime:
   - Edit `assets/reference/alpine/custom-repositories.txt`
 - Add custom package names from those repositories:
@@ -248,22 +248,22 @@ scripts/build-usb-updater-image.sh
     - `ROOT_AUTHORIZED_KEYS_FILE="$PWD/build/local-secrets/root_authorized_keys" CUSTOM_APK_KEYS_DIR="$PWD/build/local-secrets/custom-keys" APK_KEYS_EXPORT_DIR="$PWD/build/local-secrets/custom-keys" make images`
   - `Makefile` stamp hashing follows these overrides, so changing local key files triggers rebuilds automatically.
 - Inject root SSH authorized keys during image build:
-  - `ROOT_AUTHORIZED_KEYS_FILE=/path/to/authorized_keys scripts/prepare-alpine-rootfs.sh`
+  - `ROOT_AUTHORIZED_KEYS_FILE=/path/to/authorized_keys scripts/prepare-alpian-rootfs.sh`
 - Disable default key injection:
-  - `ROOT_AUTHORIZED_KEYS_FILE= scripts/prepare-alpine-rootfs.sh`
+  - `ROOT_AUTHORIZED_KEYS_FILE= scripts/prepare-alpian-rootfs.sh`
 - Disable non-blocking boot NTP sync:
-  - `ENABLE_BOOT_NTP_SYNC=0 scripts/prepare-alpine-rootfs.sh`
+  - `ENABLE_BOOT_NTP_SYNC=0 scripts/prepare-alpian-rootfs.sh`
 - Override one-shot NTP servers:
-  - `BOOT_NTP_SERVERS='pool.ntp.org time.cloudflare.com' scripts/prepare-alpine-rootfs.sh`
+  - `BOOT_NTP_SERVERS='pool.ntp.org time.cloudflare.com' scripts/prepare-alpian-rootfs.sh`
 - Disable temporary root password in future builds:
-  - `ROOT_PASSWORD_HASH= ROOT_PASSWORD_PLAIN= scripts/prepare-alpine-rootfs.sh`
+  - `ROOT_PASSWORD_HASH= ROOT_PASSWORD_PLAIN= scripts/prepare-alpian-rootfs.sh`
 - Set custom root password at build time:
-  - `ROOT_PASSWORD_PLAIN='your-password' scripts/prepare-alpine-rootfs.sh`
+  - `ROOT_PASSWORD_PLAIN='your-password' scripts/prepare-alpian-rootfs.sh`
 - Disable force-loading E54C DSA modules:
-  - `E54C_FORCE_DSA_MODULES=0 scripts/prepare-alpine-rootfs.sh`
+  - `E54C_FORCE_DSA_MODULES=0 scripts/prepare-alpian-rootfs.sh`
 - Override MOTD template used during image build:
-  - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-main scripts/prepare-alpine-rootfs.sh`
-  - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-updater scripts/prepare-alpine-rootfs.sh`
+  - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-main scripts/prepare-alpian-rootfs.sh`
+  - `MOTD_TEMPLATE_FILE=assets/reference/alpine/motd-updater scripts/prepare-alpian-rootfs.sh`
 - Override default DTB used by extlinux and `/boot/efi/boot/dtbs/rockchip`:
   - `BOARD_DTB_NAME=rk3588s-radxa-e54c.dtb scripts/assemble-image.sh`
 - Override diskless cmdline:

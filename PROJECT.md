@@ -1,4 +1,4 @@
-# Project: e54c-alpine
+# Project: alpian
 
 ## Stack
 - Radxa E54C computer

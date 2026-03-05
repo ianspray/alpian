@@ -21,8 +21,8 @@ CUSTOM_APK_KEYS_DIR_ENV := $(if $(filter undefined,$(origin CUSTOM_APK_KEYS_DIR)
 ROOT_AUTHORIZED_KEYS_FILE_ENV := $(if $(filter undefined,$(origin ROOT_AUTHORIZED_KEYS_FILE)),,ROOT_AUTHORIZED_KEYS_FILE=$(ROOT_AUTHORIZED_KEYS_FILE))
 APK_KEYS_EXPORT_DIR_ENV := $(if $(filter undefined,$(origin APK_KEYS_EXPORT_DIR)),,APK_KEYS_EXPORT_DIR=$(APK_KEYS_EXPORT_DIR))
 
-MAIN_IMAGE ?= $(REPO_ROOT)/build/$(BOARD)-alpine-custom.img
-USB_UPDATER_IMAGE ?= $(REPO_ROOT)/build/$(BOARD)-alpine-usb-updater.img
+MAIN_IMAGE ?= $(REPO_ROOT)/build/$(BOARD)-alpian-custom.img
+USB_UPDATER_IMAGE ?= $(REPO_ROOT)/build/$(BOARD)-alpian-usb-updater.img
 
 APK_INPUTS_HASH := $(STAMPS_DIR)/apk-inputs.sha256
 KERNEL_INPUTS_HASH := $(STAMPS_DIR)/kernel-inputs.sha256
@@ -69,7 +69,7 @@ help:
 	@echo "  make apk-repo           Build local custom APK repository."
 	@echo "  make uboot-assets       Fetch reference U-Boot artifacts."
 	@echo "  make kernel             Build kernel artifacts."
-	@echo "  make rootfs             Prepare Alpine rootfs."
+	@echo "  make rootfs             Prepare the Alpian rootfs."
 	@echo "  make main-image         Assemble main image."
 	@echo "  make usb-updater-image  Build USB updater image."
 	@echo "  make clean-stamps       Remove dependency stamps only."
@@ -115,7 +115,7 @@ $(ROOTFS_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	@{ \
 	  printf '%s\0' \
 	    $(BOARD_DIR)/board.env \
-	    scripts/prepare-alpine-rootfs.sh \
+	    scripts/prepare-alpian-rootfs.sh \
 	    scripts/check-tooling.sh \
 	    assets/reference/alpine/packages.txt \
 	    assets/reference/alpine/custom-packages.txt \
@@ -188,7 +188,7 @@ $(KERNEL_STAMP): $(KERNEL_INPUTS_HASH) | $(STAMPS_DIR)
 	touch "$@"
 
 $(ROOTFS_STAMP): $(ROOTFS_INPUTS_HASH) $(APK_REPO_STAMP) | $(STAMPS_DIR)
-	$(ROOT_AUTHORIZED_KEYS_FILE_ENV) $(CUSTOM_APK_KEYS_DIR_ENV) $(SCRIPTS_DIR)/prepare-alpine-rootfs.sh
+	$(ROOT_AUTHORIZED_KEYS_FILE_ENV) $(CUSTOM_APK_KEYS_DIR_ENV) $(SCRIPTS_DIR)/prepare-alpian-rootfs.sh
 	touch "$@"
 
 $(MAIN_IMAGE_STAMP): $(MAIN_IMAGE_INPUTS_HASH) $(UBOOT_ASSETS_STAMP) $(KERNEL_STAMP) $(ROOTFS_STAMP) | $(STAMPS_DIR)
@@ -214,5 +214,5 @@ distclean: clean-stamps
 		"$(REPO_ROOT)/build/kernel-artifacts" \
 		"$(REPO_ROOT)/build/kernel-out" \
 		"$(REPO_ROOT)/build/usb-updater" \
-		"$(REPO_ROOT)/build/$(BOARD)-alpine-custom.img" \
-		"$(REPO_ROOT)/build/$(BOARD)-alpine-usb-updater.img"
+		"$(REPO_ROOT)/build/$(BOARD)-alpian-custom.img" \
+		"$(REPO_ROOT)/build/$(BOARD)-alpian-usb-updater.img"

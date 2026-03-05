@@ -1,4 +1,4 @@
-E54C Alpine Main Image
+Alpian Main Image
 
 Role: production/runtime image
 Storage: tmpfs (all changes are ephemeral)
