@@ -2,9 +2,15 @@
 
 ![alpian logo](alpian.png "alpian logo")
 
-Top-level orientation for the repository and cleanup behavior.
+## Overview
 
-For full build/run details, see `src/README.md`.
+This project is based on [Alpine Linux](https://alpinelinux.org) and extends the basic ramdisc deployment to also include u-boot and Linux kernel build helpers for multiple AArch64 SBC's.  The Rdaxa devices in particular often have outadted or odd build frameworks, and each SBC often gets an a different framework with no backporting.
+
+Rather than fight with the manufacturer tooling, this project has been created to offer a very similar base O/S experience across a range of accessible AArch64 SBC's, and to make it easier to configure the O/S via custom APK's so that creating a tailored O/S is potentially easier than trying to cut down a more fully featured Linux system to fit on smaller install media.
+
+The focus is on long-term headless reliability in deployments where power supplies and networking at not provided with any guarantees - by utilising a ramdisc base system, and by offering an easier way in to wrangling OverlayFS tool deployments, the SBC's can survive unexpected outages without risk of file system corruption.  By utilising the Alpine Linux `lbu` command, customisation can be kept for a specific machine, wven with an ephemeral root image.
+
+For full build/run details, see [src/README.md](./src/README.md), and for simplified comntainerised building see [src/CONTAINER-BUILD.md](./src/CONTAINER-BUILD.md).
 
 ## Directory Layout
 
