@@ -105,6 +105,9 @@ $(KERNEL_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	  if [ -f "$(BOARD_DIR)/kernel/custom-kernel.fragment" ]; then \
 	    printf '%s\0' "$(BOARD_DIR)/kernel/custom-kernel.fragment"; \
 	  fi; \
+	  if [ -d "$(BOARD_DIR)/kernel/patches" ]; then \
+	    find "$(BOARD_DIR)/kernel/patches" -type f -name '*.patch' -print0; \
+	  fi; \
 	  if [ -d assets/reference/radxa ]; then \
 	    find assets/reference/radxa -maxdepth 1 -type f -name '*defconfig*' -print0; \
 	  fi; \
