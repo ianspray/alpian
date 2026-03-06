@@ -14,7 +14,7 @@ FIX_PERMS=1
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/run-build-in-container.sh [options] [-- <build command...>]
+  scripts/build-alpian-in-container.sh [options] [-- <build command...>]
 
 Options:
   --runtime <docker|podman>   Container runtime to use.
@@ -31,12 +31,12 @@ Environment:
   BOARD                       Board profile to build (default: e54c; options: e54c, rock5b, rock3b, rpi4).
 
 Examples:
-  scripts/run-build-in-container.sh
-  BOARD=rock5b scripts/run-build-in-container.sh -- make main-image
-  BOARD=rock3b scripts/run-build-in-container.sh -- make main-image
-  BOARD=rpi4 scripts/run-build-in-container.sh -- make main-image
-  scripts/run-build-in-container.sh -- make main-image
-  scripts/run-build-in-container.sh --rebuild-image -- scripts/build-all.sh
+  scripts/build-alpian-in-container.sh
+  BOARD=rock5b scripts/build-alpian-in-container.sh -- make main-image
+  BOARD=rock3b scripts/build-alpian-in-container.sh -- make main-image
+  BOARD=rpi4 scripts/build-alpian-in-container.sh -- make main-image
+  scripts/build-alpian-in-container.sh -- make main-image
+  scripts/build-alpian-in-container.sh --rebuild-image -- scripts/build-all.sh
 EOF
 }
 
@@ -138,7 +138,7 @@ if ! runtime_usable "$CONTAINER_RUNTIME"; then
   echo "Selected runtime '$CONTAINER_RUNTIME' is installed but not reachable." >&2
   if [ "$CONTAINER_RUNTIME" = "docker" ]; then
     echo "Tip: your docker CLI may point to a different socket/context (for example OrbStack)." >&2
-    echo "Try: ./scripts/run-build-in-container.sh --runtime podman" >&2
+    echo "Try: ./scripts/build-alpian-in-container.sh --runtime podman" >&2
   fi
   exit 1
 fi

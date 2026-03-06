@@ -11,7 +11,7 @@ This guide documents how to run board image builds in a Debian-based container, 
 ## Files
 
 - Builder image definition: `Dockerfile.builder`
-- Host wrapper: `scripts/run-build-in-container.sh`
+- Host wrapper: `scripts/build-alpian-in-container.sh`
 
 ## Prerequisites
 
@@ -29,25 +29,25 @@ This guide documents how to run board image builds in a Debian-based container, 
 From repo root:
 
 ```bash
-scripts/run-build-in-container.sh
+scripts/build-alpian-in-container.sh
 ```
 
 Build for ROCK5B:
 
 ```bash
-BOARD=rock5b scripts/run-build-in-container.sh --runtime podman
+BOARD=rock5b scripts/build-alpian-in-container.sh --runtime podman
 ```
 
 Build for ROCK3B:
 
 ```bash
-BOARD=rock3b scripts/run-build-in-container.sh --runtime podman
+BOARD=rock3b scripts/build-alpian-in-container.sh --runtime podman
 ```
 
 Build for Raspberry Pi 4:
 
 ```bash
-BOARD=rpi4 scripts/run-build-in-container.sh --runtime podman
+BOARD=rpi4 scripts/build-alpian-in-container.sh --runtime podman
 ```
 
 This will:
@@ -63,44 +63,44 @@ This will:
 Build main image only:
 
 ```bash
-scripts/run-build-in-container.sh -- make main-image
+scripts/build-alpian-in-container.sh -- make main-image
 ```
 
 Build ROCK5B main image only:
 
 ```bash
-BOARD=rock5b scripts/run-build-in-container.sh --runtime podman -- make main-image
+BOARD=rock5b scripts/build-alpian-in-container.sh --runtime podman -- make main-image
 ```
 
 Build ROCK3B main image only:
 
 ```bash
-BOARD=rock3b scripts/run-build-in-container.sh --runtime podman -- make main-image
+BOARD=rock3b scripts/build-alpian-in-container.sh --runtime podman -- make main-image
 ```
 
 Build Raspberry Pi 4 main image only:
 
 ```bash
-BOARD=rpi4 scripts/run-build-in-container.sh --runtime podman -- make main-image
+BOARD=rpi4 scripts/build-alpian-in-container.sh --runtime podman -- make main-image
 ```
 
 Force rebuild of builder image:
 
 ```bash
-scripts/run-build-in-container.sh --rebuild-image
+scripts/build-alpian-in-container.sh --rebuild-image
 ```
 
 Select runtime explicitly:
 
 ```bash
-scripts/run-build-in-container.sh --runtime docker
-scripts/run-build-in-container.sh --runtime podman
+scripts/build-alpian-in-container.sh --runtime docker
+scripts/build-alpian-in-container.sh --runtime podman
 ```
 
 Use a custom image tag:
 
 ```bash
-scripts/run-build-in-container.sh --image-tag radxa-builder:local
+scripts/build-alpian-in-container.sh --image-tag radxa-builder:local
 ```
 
 Expected output image names:
@@ -137,7 +137,7 @@ By default, the wrapper attempts to `chown` generated output back to the invokin
 Disable this behavior if desired:
 
 ```bash
-scripts/run-build-in-container.sh --no-fix-perms
+scripts/build-alpian-in-container.sh --no-fix-perms
 ```
 
 ## Host Flashing (Manual)
@@ -162,5 +162,5 @@ On macOS, use your preferred native flashing workflow.
 - Permission issues in `build/`:
   - Re-run without `--no-fix-perms`, or repair ownership manually.
 - Nested Podman/APK build failures:
-  - Rebuild builder image: `scripts/run-build-in-container.sh --rebuild-image`
+  - Rebuild builder image: `scripts/build-alpian-in-container.sh --rebuild-image`
   - Confirm host runtime supports privileged containers.
