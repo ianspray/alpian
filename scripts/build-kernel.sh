@@ -46,16 +46,18 @@ is_case_insensitive_dir() {
   return 1
 }
 
-if [ "$KERNEL_SOURCE_MODE" = "radxa-git" ] && is_case_insensitive_dir "$REPO_ROOT"; then
+if is_case_insensitive_dir "$REPO_ROOT"; then
   CASE_INSENSITIVE_WORKSPACE=1
   echo "Detected case-insensitive workspace filesystem."
-  if [ -z "$KERNEL_DIR_WAS_SET" ]; then
-    KERNEL_DIR="/tmp/radxa-kernel-$BOARD"
-    echo "Using case-sensitive kernel checkout: $KERNEL_DIR"
-  fi
-  if [ -z "$OUT_DIR_WAS_SET" ]; then
-    OUT_DIR="/tmp/${BOARD}-kernel-out"
-    echo "Using case-sensitive kernel output dir: $OUT_DIR"
+  if [ "$KERNEL_SOURCE_MODE" = "radxa-git" ]; then
+    if [ -z "$KERNEL_DIR_WAS_SET" ]; then
+      KERNEL_DIR="/tmp/radxa-kernel-$BOARD"
+      echo "Using case-sensitive kernel checkout: $KERNEL_DIR"
+    fi
+    if [ -z "$OUT_DIR_WAS_SET" ]; then
+      OUT_DIR="/tmp/${BOARD}-kernel-out"
+      echo "Using case-sensitive kernel output dir: $OUT_DIR"
+    fi
   fi
 fi
 
@@ -343,7 +345,15 @@ build_from_alpine_rpi_image() {
     find "$boot_extract" -maxdepth 3 -type f -name '*.dtb' -exec cp {} "$RELEASE_DIR/boot/dtbs/broadcom/" \;
   fi
 
-  cp -a "$modules_root" "$RELEASE_DIR/rootfs/lib/"
+  if [ "$CASE_INSENSITIVE_WORKSPACE" -eq 1 ]; then
+    modules_stage="$(mktemp -d)"
+    cp -a "$modules_root" "$modules_stage/"
+    tar -C "$modules_stage" -cf "$RELEASE_DIR/modules-rootfs.tar" modules
+    rm -rf "$modules_stage" "$RELEASE_DIR/rootfs"
+    echo "Stored modules in $RELEASE_DIR/modules-rootfs.tar for case-insensitive workspace compatibility."
+  else
+    cp -a "$modules_root" "$RELEASE_DIR/rootfs/lib/"
+  fi
 
   echo "Kernel artifacts prepared from Alpine RPi image."
   echo "Kernel release: $KERNEL_RELEASE"
