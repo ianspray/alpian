@@ -192,82 +192,28 @@ build_from_radxa_source() {
 }
 
 build_from_alpine_rpi_image() {
-  extract_with_guestfish() {
+  extract_with_mtools() {
     local image_path="$1"
     local boot_extract="$2"
     local modules_extract="$3"
-    local boot_tar modules_tar
-
-    boot_tar="$tmp_work/boot.tar"
-    modules_tar="$tmp_work/modules.tar"
-
-    guestfish <<EOF
-add-drive-ro $image_path
-run
-mount-ro /dev/sda1 /
-tar-out / $boot_tar
-umount /
-mount-ro /dev/sda2 /
-tar-out /lib/modules $modules_tar
-EOF
-
-    mkdir -p "$boot_extract" "$modules_extract"
-    tar -xf "$boot_tar" -C "$boot_extract"
-    tar -xf "$modules_tar" -C "$modules_extract"
-  }
-
-  extract_with_mounts() {
-    local image_path="$1"
-    local boot_extract="$2"
-    local modules_extract="$3"
-    local boot_offset root_offset
-    local boot_mount="$tmp_work/boot-mount"
-    local root_mount="$tmp_work/root-mount"
-    local boot_mounted=0
-    local root_mounted=0
-    cleanup_extract_mounts() {
-      if [ "$root_mounted" -eq 1 ]; then
-        umount "$root_mount" || true
-        root_mounted=0
-      fi
-      if [ "$boot_mounted" -eq 1 ]; then
-        umount "$boot_mount" || true
-        boot_mounted=0
-      fi
-    }
+    local boot_offset modloop_path
 
     boot_offset="$(parted -m -s "$image_path" unit B print | awk -F: '$1=="1"{gsub(/B/, "", $2); print $2; exit}')"
-    root_offset="$(parted -m -s "$image_path" unit B print | awk -F: '$1=="2"{gsub(/B/, "", $2); print $2; exit}')"
-
-    if [ -z "$boot_offset" ] || [ -z "$root_offset" ]; then
-      echo "Unable to determine partition offsets for Alpine RPi image." >&2
+    if [ -z "$boot_offset" ]; then
+      echo "Unable to determine the boot partition offset for the Alpine RPi image." >&2
       return 1
     fi
 
-    mkdir -p "$boot_extract" "$modules_extract" "$boot_mount" "$root_mount"
+    mkdir -p "$boot_extract" "$modules_extract"
+    mcopy -i "$image_path@@$boot_offset" -s :: "$boot_extract"
 
-    mount -o ro,loop,offset="$boot_offset" -t vfat "$image_path" "$boot_mount" || {
-      cleanup_extract_mounts
+    modloop_path="$boot_extract/boot/modloop-rpi"
+    if [ ! -f "$modloop_path" ]; then
+      echo "Missing boot/modloop-rpi in extracted Alpine RPi image." >&2
       return 1
-    }
-    boot_mounted=1
-    mount -o ro,loop,offset="$root_offset" -t ext4 "$image_path" "$root_mount" || {
-      cleanup_extract_mounts
-      return 1
-    }
-    root_mounted=1
+    fi
 
-    cp -a "$boot_mount"/. "$boot_extract"/ || {
-      cleanup_extract_mounts
-      return 1
-    }
-    mkdir -p "$modules_extract/lib"
-    cp -a "$root_mount/lib/modules" "$modules_extract/lib/" || {
-      cleanup_extract_mounts
-      return 1
-    }
-
-    cleanup_extract_mounts
+    unsquashfs -d "$modules_extract" "$modloop_path" >/dev/null
   }
 
   extract_image_contents() {
@@ -277,34 +223,13 @@ EOF
     local mode="$RPI_IMAGE_EXTRACT_MODE"
 
     case "$mode" in
-      auto)
-        if [ "$(id -u)" -eq 0 ]; then
-          echo "Extracting Alpine RPi image via loop mounts."
-          if extract_with_mounts "$image_path" "$boot_extract" "$modules_extract"; then
-            return 0
-          fi
-          echo "Loop-mount extraction failed; falling back to guestfish." >&2
-          extract_with_guestfish "$image_path" "$boot_extract" "$modules_extract"
-        else
-          echo "Extracting Alpine RPi image via guestfish."
-          if extract_with_guestfish "$image_path" "$boot_extract" "$modules_extract"; then
-            return 0
-          fi
-          echo "guestfish extraction failed; trying loop mounts." >&2
-          extract_with_mounts "$image_path" "$boot_extract" "$modules_extract"
-        fi
-        ;;
-      guestfish)
-        echo "Extracting Alpine RPi image via guestfish."
-        extract_with_guestfish "$image_path" "$boot_extract" "$modules_extract"
-        ;;
-      mount)
-        echo "Extracting Alpine RPi image via loop mounts."
-        extract_with_mounts "$image_path" "$boot_extract" "$modules_extract"
+      auto|mtools)
+        echo "Extracting Alpine RPi image via mtools and modloop."
+        extract_with_mtools "$image_path" "$boot_extract" "$modules_extract"
         ;;
       *)
         echo "Unsupported RPI_IMAGE_EXTRACT_MODE: $mode" >&2
-        echo "Supported: auto, guestfish, mount" >&2
+        echo "Supported: auto, mtools" >&2
         return 1
         ;;
     esac
@@ -349,15 +274,7 @@ EOF
   fi
 
   tmp_work="$(mktemp -d)"
-  boot_mount="$tmp_work/boot-mount"
-  root_mount="$tmp_work/root-mount"
   cleanup_tmp_work() {
-    if mountpoint -q "$root_mount" 2>/dev/null; then
-      umount "$root_mount" || true
-    fi
-    if mountpoint -q "$boot_mount" 2>/dev/null; then
-      umount "$boot_mount" || true
-    fi
     rm -rf "$tmp_work"
   }
   trap cleanup_tmp_work EXIT
@@ -379,7 +296,7 @@ EOF
   fi
 
   if [ -z "$modules_root" ] || [ ! -d "$modules_root" ]; then
-    echo "Unable to locate /lib/modules in extracted Alpine RPi image." >&2
+    echo "Unable to locate kernel modules in extracted Alpine RPi image." >&2
     exit 1
   fi
 

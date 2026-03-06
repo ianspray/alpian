@@ -52,9 +52,9 @@ BOARD=rpi4 scripts/build-alpian-in-container.sh --runtime podman
 
 This will:
 
-1. Build `radxa-builder:bookworm` from `Dockerfile.builder` if missing.
+1. Build `localhost/alpian-builder:bookworm` from `Dockerfile.builder` if missing.
 2. Start a privileged container with the repo bind-mounted at `/workspace`.
-3. Run `make images` inside the container.
+3. Run `make images` inside the container, with `libguestfs` forced to the direct backend and TCG.
 4. Write artifacts to host `build/` through the bind mount.
 5. Use `BOARD` from the host environment (default: `e54c`).
 
@@ -100,7 +100,7 @@ scripts/build-alpian-in-container.sh --runtime podman
 Use a custom image tag:
 
 ```bash
-scripts/build-alpian-in-container.sh --image-tag radxa-builder:local
+scripts/build-alpian-in-container.sh --image-tag localhost/alpian-builder:local
 ```
 
 Expected output image names:
@@ -126,6 +126,8 @@ Notes by board:
 ## Why Privileged Mode Is Required
 
 The build pipeline uses Linux-native image and block tooling (`guestfish`, partition/mkfs tooling, loop-backed operations) and runs `podman` for APK repo generation. Running with `--privileged` is the most reliable way to support these operations inside the builder container.
+
+The wrapper also sets `LIBGUESTFS_BACKEND=direct` and `LIBGUESTFS_BACKEND_SETTINGS=force_tcg` inside the container. This avoids `qemu-system-aarch64` selecting a KVM-only GIC mode on hosts where nested containers do not expose `/dev/kvm`.
 
 ## Ownership and Permissions
 
