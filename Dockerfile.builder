@@ -37,6 +37,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
   podman \
   python3 \
   qemu-utils \
+  ripgrep \
   rsync \
   gcc-aarch64-linux-gnu \
   binutils-aarch64-linux-gnu \
