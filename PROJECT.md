@@ -53,6 +53,8 @@ e that the change summary is in the body of the commit message
   - Once started, the USB updater should emit progress markers to the serial console
   - The Updater must reflash the internal NVMe image with the copy it carries
   - After updating, the USB Updater should make itself non-bootable as far as u-boot is concerned
+    - Prefer renaming or otherwise hiding the USB boot files so the media can be reused on another platform
+    - If a target board's u-boot does not fall through to the next bootable GPT target after the boot files are renamed, it is acceptable to also clear the GPT bootable flag
   - It should then reboot the system, which will then skip the USB drive and contonue on to boot into NVMe
 - The E54C SPI u-boot image may need to be updated to enable USB booting
 - All code generated for this project is under the MIT licence
@@ -78,8 +80,9 @@ e that the change summary is in the body of the commit message
 - The image filenames listed in this document are operator-supplied reference inputs
   - They are not required to exist in the repository by default
 - Commit at the end of every completed task by default
-- Open clarification:
-  - Define the exact mechanism the USB updater should use after flashing to make itself non-bootable to u-boot
+- For the USB updater post-flash handoff, prefer renaming boot files first
+  - This keeps the updater media reusable on other platforms
+  - If a target board's u-boot does not fail over after boot files are renamed, it is acceptable to also clear the GPT bootable flag
 
 ## E54C Guides
 - Radxa documentation about the E54C: https://docs.radxa.com/en/e/e54c
