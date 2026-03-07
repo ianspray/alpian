@@ -1,15 +1,26 @@
 # Project: alpian
 
 ## Stack
-- Radxa E54C computer
-  - NVMe booting
-  - SPI Flash already programmed with uBoot
+- Different AArch64 Single Board Computers, eg:
+  - Radxa E54C
+  - Radxa Rock5B
+  - Radxa Rock3B
+  - FriendlyElec NanoPi R3S
+  - Raspberry Pi 4
+- Where the hardware supports it:
+  - NVMe booting or eMMC booting
+  - SPI Flash with uBoot
+  - USB for recovery image booting
 - Alpine Linux
+  - Run from an initrd
+  - Restricted amounts of free space in the RAM disc
+  - Custom APK builds
+  - Additional APK installations in the initrd
 
 
 ## Rules
 - Modifications to existing bootable images need to be done in a way that can be scripted
-- Care must be taken over the booting details for the Radxa E54C
+- Care must be taken over the booting details for the Radxa devices
   - Partitions need to be declared at specific offsets
   - There may be binary data in the bootable image that is not inside a partition
 - If anything is unclear, pause and await clarification
@@ -22,6 +33,7 @@ e that the change summary is in the body of the commit message
 
 ## Architecture
 - Use a Debian AArch64 base system for constructing the initial system
+  - Also maintain a containerised build mechanism that re-uses the native Linux scripts
 - The Alpine Linux releases will always have a more recent kernel than the Radxa ones
 - Not all of the Radxa kernel modules may build outside of the Rdaxa tree
 - The Alpine Linux build system may be utilised if it is advantageous
@@ -49,11 +61,11 @@ e that the change summary is in the body of the commit message
   - For shell scripts, do not break the `#!` first line declaration with SPDX
   - For files that are downloaded, do not claim or modify any licence information
 
-## Guides
+## E54C Guides
 - Radxa documentation about the E54C: https://docs.radxa.com/en/e/e54c
 - The Radxa guide to booting the E54C from NVMe: https://docs.radxa.com/en/e/e54c/getting-started/install-os/boot_from_nvme
 
-## Files
+## E54C Files
 - The Alpine image that should be booted on the E54C:
   - alpine-standard-3.23.3-aarch64.iso
 - An Alpine image that is booted using uBoot, which may be uyseful for reference:
