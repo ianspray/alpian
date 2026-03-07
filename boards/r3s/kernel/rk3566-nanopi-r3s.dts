@@ -101,6 +101,16 @@
 		regulator-max-microvolt = <900000>;
 		vin-supply = <&vcc3v3_sys>;
 	};
+
+	vdd_logic: regulator-vdd-logic {
+		compatible = "regulator-fixed";
+		regulator-name = "vdd_logic";
+		regulator-always-on;
+		regulator-boot-on;
+		regulator-min-microvolt = <900000>;
+		regulator-max-microvolt = <900000>;
+		vin-supply = <&vcc3v3_sys>;
+	};
 };
 
 &cpu0 {
