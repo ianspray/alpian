@@ -45,6 +45,7 @@ SERIAL_TTY="${SERIAL_TTY:-${BOARD_SERIAL_TTY:-ttyFIQ0}}"
 SERIAL_BAUD="${SERIAL_BAUD:-${BOARD_SERIAL_BAUD:-1500000}}"
 UPDATER_DISKLESS_TMPFS_MARGIN_MIB="${UPDATER_DISKLESS_TMPFS_MARGIN_MIB:-${DISKLESS_TMPFS_MARGIN_MIB:-200}}"
 UPDATER_DISKLESS_TMPFS_SIZE_MIB="${UPDATER_DISKLESS_TMPFS_SIZE_MIB:-}"
+CMDLINE_BASE_DEFAULT="${BOARD_KERNEL_CMDLINE_BASE_DEFAULT:-root=PARTLABEL=rootfs rootfstype=ext4 rootwait=30 console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off}"
 
 # In containerized macOS workflows, bind-mounted /workspace can reject
 # extraction/deletion of many rootfs files. Prefer container-local paths.
@@ -176,7 +177,9 @@ if [ -z "$USB_IMAGE_SIZE" ]; then
 fi
 
 echo "Assembling updater image..."
-UPDATER_CMDLINE_COMMON="root=PARTLABEL=$UPDATER_ROOT_PARTLABEL rootfstype=ext4 rootwait=30 ro diskless=yes diskless_tmpfs_size=${UPDATER_DISKLESS_TMPFS_SIZE_MIB} console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off"
+UPDATER_CMDLINE_BASE_DEFAULT="$(printf '%s\n' "$CMDLINE_BASE_DEFAULT" | sed -E "s#(^| )root=[^ ]+# root=PARTLABEL=${UPDATER_ROOT_PARTLABEL}#; s#^ ##")"
+UPDATER_CMDLINE_BASE="${UPDATER_KERNEL_CMDLINE_BASE:-${BOARD_UPDATER_KERNEL_CMDLINE_BASE_DEFAULT:-$UPDATER_CMDLINE_BASE_DEFAULT}}"
+UPDATER_CMDLINE_COMMON="${UPDATER_CMDLINE_BASE} ro diskless=yes diskless_tmpfs_size=${UPDATER_DISKLESS_TMPFS_SIZE_MIB}"
 IMAGE_PATH="$USB_UPDATER_IMAGE_PATH" \
 IMAGE_SIZE="$USB_IMAGE_SIZE" \
 ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \
