@@ -43,6 +43,7 @@ INITRAMFS_NAME="${INITRAMFS_NAME:-initramfs-${BOARD}.cpio.gz}"
 SINGLE_BOOT_LABEL="${SINGLE_BOOT_LABEL:-immutable}"
 CONFIG_PART_GPT_TYPE="${CONFIG_PART_GPT_TYPE:-0FC63DAF-8483-4772-8E79-3D69D8477DE4}"
 BOOTCFG_PART_GPT_TYPE="${BOOTCFG_PART_GPT_TYPE:-C12A7328-F81F-11D2-BA4B-00A0C93EC93B}"
+BOOTABLE_GPT_PARTITIONS="${BOOTABLE_GPT_PARTITIONS:-${BOARD_BOOTABLE_GPT_PARTITIONS_DEFAULT:-2 3}}"
 SPI_IDBLOADER_LBA="${SPI_IDBLOADER_LBA:-${BOARD_SPI_IDBLOADER_LBA_DEFAULT:-64}}"
 SPI_UBOOT_ITB_LBA="${SPI_UBOOT_ITB_LBA:-${BOARD_SPI_UBOOT_ITB_LBA_DEFAULT:-16384}}"
 DISKLESS_TMPFS_MARGIN_MIB="${DISKLESS_TMPFS_MARGIN_MIB:-200}"
@@ -397,7 +398,7 @@ case "$BOOT_SCHEME" in
     cat >"$tmp_stage/boot/extlinux/extlinux.conf" <<EOF
 DEFAULT ${DEFAULT_EXTLINUX_LABEL}
 MENU TITLE U-Boot menu
-PROMPT 1
+PROMPT 0
 TIMEOUT 50
 
 LABEL immutable
@@ -543,9 +544,14 @@ if [ "$BOOTLOADER_MODE" = "spi-dd" ]; then
 fi
 
 if [ "$BOOT_SCHEME" = "rockchip-extlinux" ]; then
-  # Match Radxa GPT partition attributes:
-  # attribute flags 0x4 (bit 2) set on p2 and p3.
-  /usr/sbin/sgdisk --attributes=2:set:2 --attributes=3:set:2 "$IMAGE_PATH" >/dev/null
+  # Some vendor U-Boot builds only scan GPT entries with the legacy BIOS
+  # bootable attribute set. Keep that list board-configurable.
+  for partno in 1 2 3; do
+    /usr/sbin/sgdisk --attributes="${partno}:clear:2" "$IMAGE_PATH" >/dev/null
+  done
+  for partno in $BOOTABLE_GPT_PARTITIONS; do
+    /usr/sbin/sgdisk --attributes="${partno}:set:2" "$IMAGE_PATH" >/dev/null
+  done
 fi
 
 echo "Image assembled: $IMAGE_PATH"

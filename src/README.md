@@ -135,7 +135,7 @@ All scripts in `scripts/` and their primary purpose:
   - Download board bootloader reference assets and extract required `idbloader.img` and `u-boot.itb` into `boards/<board>/u-boot`.
   - Uses board fetch profile defaults from `boards/<board>/u-boot-fetch.env` when present.
 - `scripts/fetch-radxa-kernel.sh`
-  - Clone/update the Radxa kernel source tree used by Radxa kernel builds.
+  - Clone/update the board-selected git kernel source tree used by git-backed kernel builds.
   - Applies optional board-local patches from `boards/<board>/kernel/patches/*.patch`.
 - `scripts/build-kernel.sh`
   - Build or fetch kernel image, modules, and DTBs for the selected board profile.
@@ -186,11 +186,15 @@ scripts/build-usb-updater-image.sh
 - `rock3b` backports the upstream ROCK 3B device tree into the shared Radxa BSP branch
   and uses `rk3568-rock-3b.dtb` as the default boot DTB.
 
-- `r3s` backports the upstream NanoPi R3S device tree into the shared Radxa BSP branch,
-  uses FriendlyElec's published RK3566 `idbloader.img` and `uboot.img` artifacts as the
-  U-Boot source, and boots via U-Boot extlinux from TF/eMMC.
+- `r3s` now defaults to FriendlyElec's `kernel-rockchip` RK3566 6.1 branch with
+  `nanopi5_linux_defconfig` plus `kvm.config`, uses FriendlyElec's published
+  RK3566 `idbloader.img` and `uboot.img` artifacts as the U-Boot source, and
+  boots via U-Boot extlinux from TF/eMMC.
   FriendlyElec's U-Boot environment prefers `mmc1` before `mmc0`, so the practical
   first-install path is to write the updater image to TF and let it flash eMMC.
+  Its vendor U-Boot boot scan is sensitive to partition flags and extlinux placement,
+  so Alpian keeps both the updater `efi` and `rootfs` partitions bootable and stores
+  updater boot entries in both locations for compatibility.
 
 - `rpi4` uses Alpine's published Raspberry Pi image as the kernel/firmware/modules source
   (configured in `boards/rpi4/board.env`) and boots via Pi firmware

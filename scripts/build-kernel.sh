@@ -20,8 +20,11 @@ CURRENT_ARTIFACT_FILE="${CURRENT_ARTIFACT_FILE:-$ARTIFACTS_DIR/current-$BOARD}"
 ARCH="${ARCH:-arm64}"
 CROSS_COMPILE="${CROSS_COMPILE:-}"
 JOBS="${JOBS:-}"
-DEFCONFIG_TARGET="${DEFCONFIG_TARGET:-rockchip_linux_defconfig}"
+DEFCONFIG_TARGET="${DEFCONFIG_TARGET:-${BOARD_KERNEL_DEFCONFIG_TARGET_DEFAULT:-rockchip_linux_defconfig}}"
+DEFCONFIG_EXTRA_TARGETS="${DEFCONFIG_EXTRA_TARGETS:-${BOARD_KERNEL_DEFCONFIG_EXTRA_TARGETS_DEFAULT:-}}"
 FRAGMENT_FILE="${FRAGMENT_FILE:-${BOARD_KERNEL_FRAGMENT_FILE:-$REPO_ROOT/assets/reference/radxa/custom-kernel.fragment}}"
+KERNEL_CONFIG_MODE="${KERNEL_CONFIG_MODE:-${BOARD_KERNEL_CONFIG_MODE:-radxa-merge}}"
+KERNEL_CONFIG_MERGE_FILES="${KERNEL_CONFIG_MERGE_FILES:-${BOARD_KERNEL_CONFIG_MERGE_FILES_DEFAULT:-arch/arm64/configs/rk3588_linux.config}}"
 KERNEL_DTBS="${KERNEL_DTBS:-${BOARD_KERNEL_DTBS:-rk3588s-radxa-e54c.dtb rk3588s-radxa-e54c-spi.dtb}}"
 KERNEL_DTB_SUBDIR="${KERNEL_DTB_SUBDIR:-${BOARD_DTB_SUBDIR_DEFAULT:-rockchip}}"
 BUILD_TARGETS="${BUILD_TARGETS:-Image dtbs modules}"
@@ -124,6 +127,29 @@ detect_toolchain() {
   esac
 }
 
+resolve_kernel_config_path() {
+  local candidate="$1"
+
+  [ -n "$candidate" ] || return 1
+
+  if [ -f "$candidate" ]; then
+    printf '%s\n' "$candidate"
+    return 0
+  fi
+
+  if [ -f "$KERNEL_DIR/$candidate" ]; then
+    printf '%s\n' "$KERNEL_DIR/$candidate"
+    return 0
+  fi
+
+  if [ -f "$REPO_ROOT/$candidate" ]; then
+    printf '%s\n' "$REPO_ROOT/$candidate"
+    return 0
+  fi
+
+  return 1
+}
+
 build_from_radxa_source() {
   export BOARD
   export KERNEL_DIR
@@ -147,17 +173,59 @@ build_from_radxa_source() {
   if [ -n "$CROSS_COMPILE" ]; then
     echo "Kernel toolchain prefix: $CROSS_COMPILE"
   fi
-  echo "Generating base kernel config ($DEFCONFIG_TARGET)"
-  make "${MAKE_ARGS[@]}" "$DEFCONFIG_TARGET"
+  echo "Generating base kernel config ($DEFCONFIG_TARGET${DEFCONFIG_EXTRA_TARGETS:+ $DEFCONFIG_EXTRA_TARGETS})"
+  make "${MAKE_ARGS[@]}" "$DEFCONFIG_TARGET" $DEFCONFIG_EXTRA_TARGETS
 
-  echo "Merging vendor rk3588 config + custom fragment"
-  "$KERNEL_DIR/scripts/kconfig/merge_config.sh" \
-    -m -O "$OUT_DIR" \
-    "$OUT_DIR/.config" \
-    "$KERNEL_DIR/arch/arm64/configs/rk3588_linux.config" \
-    "$FRAGMENT_FILE"
+  case "$KERNEL_CONFIG_MODE" in
+    radxa-merge)
+      merge_inputs=()
+      for merge_file in $KERNEL_CONFIG_MERGE_FILES; do
+        resolved_merge_file="$(resolve_kernel_config_path "$merge_file" || true)"
+        if [ -z "$resolved_merge_file" ]; then
+          echo "Kernel config merge file not found: $merge_file" >&2
+          exit 1
+        fi
+        merge_inputs+=("$resolved_merge_file")
+      done
+      if [ -n "$FRAGMENT_FILE" ]; then
+        resolved_fragment_file="$(resolve_kernel_config_path "$FRAGMENT_FILE" || true)"
+        if [ -z "$resolved_fragment_file" ]; then
+          echo "Kernel fragment file not found: $FRAGMENT_FILE" >&2
+          exit 1
+        fi
+        merge_inputs+=("$resolved_fragment_file")
+      fi
 
-  make "${MAKE_ARGS[@]}" olddefconfig
+      if [ "${#merge_inputs[@]}" -gt 0 ]; then
+        echo "Merging board kernel config fragments"
+        "$KERNEL_DIR/scripts/kconfig/merge_config.sh" \
+          -m -O "$OUT_DIR" \
+          "$OUT_DIR/.config" \
+          "${merge_inputs[@]}"
+        make "${MAKE_ARGS[@]}" olddefconfig
+      fi
+      ;;
+    defconfig-targets)
+      if [ -n "$FRAGMENT_FILE" ]; then
+        resolved_fragment_file="$(resolve_kernel_config_path "$FRAGMENT_FILE" || true)"
+        if [ -z "$resolved_fragment_file" ]; then
+          echo "Kernel fragment file not found: $FRAGMENT_FILE" >&2
+          exit 1
+        fi
+        echo "Merging board kernel fragment"
+        "$KERNEL_DIR/scripts/kconfig/merge_config.sh" \
+          -m -O "$OUT_DIR" \
+          "$OUT_DIR/.config" \
+          "$resolved_fragment_file"
+        make "${MAKE_ARGS[@]}" olddefconfig
+      fi
+      ;;
+    *)
+      echo "Unsupported KERNEL_CONFIG_MODE: $KERNEL_CONFIG_MODE" >&2
+      echo "Supported: radxa-merge, defconfig-targets" >&2
+      exit 1
+      ;;
+  esac
 
   echo "Building kernel targets: $BUILD_TARGETS (jobs=$JOBS)"
   make "${MAKE_ARGS[@]}" -j"$JOBS" $BUILD_TARGETS

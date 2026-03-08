@@ -20,6 +20,13 @@ KERNEL_PREPARE_SCRIPT="${KERNEL_PREPARE_SCRIPT:-${BOARD_KERNEL_PREPARE_SCRIPT:-}
 
 if [ -d "$KERNEL_DIR/.git" ]; then
   echo "Refreshing existing kernel checkout in $KERNEL_DIR"
+  current_origin="$(git -C "$KERNEL_DIR" remote get-url origin 2>/dev/null || true)"
+  if [ -n "$current_origin" ] && [ "$current_origin" != "$KERNEL_REPO" ]; then
+    echo "Updating kernel remote origin:"
+    echo "  old: $current_origin"
+    echo "  new: $KERNEL_REPO"
+    git -C "$KERNEL_DIR" remote set-url origin "$KERNEL_REPO"
+  fi
   git -C "$KERNEL_DIR" fetch --depth 1 origin "$KERNEL_BRANCH"
   git -C "$KERNEL_DIR" checkout -f -B "$KERNEL_BRANCH" "origin/$KERNEL_BRANCH"
 else
