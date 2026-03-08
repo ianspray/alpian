@@ -190,6 +190,7 @@ BB=/bin/busybox
 PATH=/bin:/sbin
 
 log() {
+  echo "<6>[initramfs] \$*" >/dev/kmsg 2>/dev/null || true
   echo "[initramfs] \$*" >/dev/console 2>/dev/null || echo "[initramfs] \$*"
 }
 

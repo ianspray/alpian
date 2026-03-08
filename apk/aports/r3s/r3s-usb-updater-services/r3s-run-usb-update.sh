@@ -12,6 +12,8 @@ LOCK_DIR="/run/r3s-usb-update.lock"
 BOOT_DONE_MARKER="/run/r3s-usb-update.done"
 
 log() {
+  echo "<6>[r3s-usb-updater] $*" >/dev/kmsg 2>/dev/null || true
+  echo "[r3s-usb-updater] $*" >/dev/console 2>/dev/null || true
   echo "[r3s-usb-updater] $*"
 }
 

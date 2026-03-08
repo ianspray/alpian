@@ -45,6 +45,7 @@ SERIAL_TTY="${SERIAL_TTY:-${BOARD_SERIAL_TTY:-ttyFIQ0}}"
 SERIAL_BAUD="${SERIAL_BAUD:-${BOARD_SERIAL_BAUD:-1500000}}"
 UPDATER_DISKLESS_TMPFS_MARGIN_MIB="${UPDATER_DISKLESS_TMPFS_MARGIN_MIB:-${DISKLESS_TMPFS_MARGIN_MIB:-200}}"
 UPDATER_DISKLESS_TMPFS_SIZE_MIB="${UPDATER_DISKLESS_TMPFS_SIZE_MIB:-}"
+UPDATER_DISKLESS="${UPDATER_DISKLESS:-${BOARD_UPDATER_DISKLESS_DEFAULT:-1}}"
 CMDLINE_BASE_DEFAULT="${BOARD_KERNEL_CMDLINE_BASE_DEFAULT:-root=PARTLABEL=rootfs rootfstype=ext4 rootwait=30 console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off}"
 
 # In containerized macOS workflows, bind-mounted /workspace can reject
@@ -119,6 +120,16 @@ BOOT_BANNER_TITLE="${BOARD_DISPLAY_NAME} updater image" \
 MOTD_TEMPLATE_FILE="$REPO_ROOT/assets/reference/alpine/motd-updater" \
 "$SCRIPT_DIR/prepare-alpian-rootfs.sh"
 
+if [ -f "$UPDATER_ROOTFS_DIR/etc/inittab" ]; then
+  inittab_tmp="$(mktemp)"
+  {
+    printf '%s\n' '# updater debug marker'
+    printf '%s\n' '::sysinit:/bin/sh -c '\''echo "<6>[updater-userspace] pid1 reached sysinit" >/dev/kmsg 2>/dev/null || true; echo "[updater-userspace] pid1 reached sysinit" >/dev/console 2>/dev/null || true'\'''
+    cat "$UPDATER_ROOTFS_DIR/etc/inittab"
+  } >"$inittab_tmp"
+  mv "$inittab_tmp" "$UPDATER_ROOTFS_DIR/etc/inittab"
+fi
+
 # Updater image must be able to persistently edit its own boot entries.
 # Keep root writable fallback if overlaytmpfs is not active.
 rm -f "$UPDATER_ROOTFS_DIR/etc/runlevels/boot/$UPDATER_ROOTMODE_SERVICE_NAME"
@@ -179,13 +190,27 @@ fi
 echo "Assembling updater image..."
 UPDATER_CMDLINE_BASE_DEFAULT="$(printf '%s\n' "$CMDLINE_BASE_DEFAULT" | sed -E "s#(^| )root=[^ ]+# root=PARTLABEL=${UPDATER_ROOT_PARTLABEL}#; s#^ ##")"
 UPDATER_CMDLINE_BASE="${UPDATER_KERNEL_CMDLINE_BASE:-${BOARD_UPDATER_KERNEL_CMDLINE_BASE_DEFAULT:-$UPDATER_CMDLINE_BASE_DEFAULT}}"
-UPDATER_CMDLINE_COMMON="${UPDATER_CMDLINE_BASE} ro diskless=yes diskless_tmpfs_size=${UPDATER_DISKLESS_TMPFS_SIZE_MIB}"
+case "$UPDATER_DISKLESS" in
+  1|yes|true)
+    UPDATER_ENABLE_INITRAMFS_BOOT=1
+    UPDATER_CMDLINE_COMMON="${UPDATER_CMDLINE_BASE} ro diskless=yes diskless_tmpfs_size=${UPDATER_DISKLESS_TMPFS_SIZE_MIB}"
+    ;;
+  0|no|false)
+    UPDATER_ENABLE_INITRAMFS_BOOT=0
+    UPDATER_CMDLINE_COMMON="${UPDATER_CMDLINE_BASE} rw"
+    ;;
+  *)
+    echo "Invalid UPDATER_DISKLESS value: $UPDATER_DISKLESS" >&2
+    exit 1
+    ;;
+esac
 IMAGE_PATH="$USB_UPDATER_IMAGE_PATH" \
 IMAGE_SIZE="$USB_IMAGE_SIZE" \
 ROOTFS_TAR="$UPDATER_ROOTFS_TAR" \
 ROOTFS_PARTLABEL="$UPDATER_ROOT_PARTLABEL" \
 ROOTFS_MKFS_LABEL="$UPDATER_ROOTFS_MKFS_LABEL" \
 INITRAMFS_NAME="$UPDATER_INITRAMFS_NAME" \
+ENABLE_INITRAMFS_BOOT="$UPDATER_ENABLE_INITRAMFS_BOOT" \
 BOOTCFG_PART_GPT_TYPE="EBD0A0A2-B9E5-4433-87C0-68B6B72699C7" \
 DEFAULT_BOOT_MODE=maintenance \
 KERNEL_CMDLINE_MAINTENANCE="$UPDATER_CMDLINE_COMMON" \
@@ -195,6 +220,10 @@ KERNEL_CMDLINE_IMMUTABLE="$UPDATER_CMDLINE_COMMON" \
 if [ "$BOOT_SCHEME" = "rockchip-extlinux" ]; then
   tmp_extlinux="$(mktemp)"
   trap 'rm -f "$tmp_extlinux"' EXIT
+  tmp_initrd_line=""
+  if [ "$UPDATER_ENABLE_INITRAMFS_BOOT" = "1" ]; then
+    tmp_initrd_line="  INITRD /boot/${UPDATER_INITRAMFS_NAME}"
+  fi
   cat >"$tmp_extlinux" <<EOF
 DEFAULT updater
 MENU TITLE U-Boot menu
@@ -204,8 +233,8 @@ TIMEOUT 10
 LABEL updater
   MENU LABEL Alpian updater image (flash target storage and reboot)
   LINUX /boot/Image
-  INITRD /boot/${UPDATER_INITRAMFS_NAME}
   FDT /boot/dtbs/${BOARD_DTB_SUBDIR}/${UPDATER_DTB_NAME}
+${tmp_initrd_line}
   APPEND ${UPDATER_CMDLINE_COMMON}
 EOF
 
