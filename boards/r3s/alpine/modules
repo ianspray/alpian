@@ -1,2 +1,4 @@
 # NanoPi R3S module preload list.
-# Keep empty unless you need board-specific early module loading.
+# The second NIC sits behind PCIe and may not be auto-probed early enough
+# in this Alpine profile, so force-load the Realtek driver.
+r8169
