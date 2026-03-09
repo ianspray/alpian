@@ -102,6 +102,33 @@ directory_size_kib() {
   du -sk "$dir" 2>/dev/null | awk 'NR == 1 {print $1}'
 }
 
+calculate_diskless_tmpfs_size_mib() {
+  local size_root="$1"
+  local boot_stage_root="$2"
+  local rootfs_size_kib=""
+  local rootfs_size_mib=0
+
+  mkdir -p "$size_root"
+  tar -xf "$ROOTFS_TAR" -C "$size_root"
+
+  case "$BOOT_SCHEME" in
+    rockchip-extlinux)
+      cp -a "$boot_stage_root/boot" "$size_root/"
+      ;;
+  esac
+
+  tar -xf "$MODULES_TAR" -C "$size_root"
+
+  rootfs_size_kib="$(directory_size_kib "$size_root")"
+  if [ -z "$rootfs_size_kib" ] || [ "$rootfs_size_kib" -le 0 ] 2>/dev/null; then
+    echo "Unable to determine extracted rootfs size for diskless sizing." >&2
+    exit 1
+  fi
+
+  rootfs_size_mib=$(((rootfs_size_kib + 1024 - 1) / 1024))
+  printf '%s\n' $((rootfs_size_mib + DISKLESS_TMPFS_MARGIN_MIB))
+}
+
 # libguestfs/supermin requires a host kernel + modules available in the
 # build environment to construct its appliance.
 if ! ls /boot/vmlinuz* >/dev/null 2>&1 || ! ls -d /lib/modules/* >/dev/null 2>&1; then
@@ -123,33 +150,6 @@ truncate -s "$IMAGE_SIZE" "$IMAGE_PATH"
 
 tmp_stage="$(mktemp -d)"
 trap 'rm -rf "$tmp_stage"' EXIT
-
-if [ -z "$DISKLESS_TMPFS_SIZE_MIB" ]; then
-  rootfs_size_dir="$tmp_stage/rootfs-size"
-  mkdir -p "$rootfs_size_dir"
-  tar -xf "$ROOTFS_TAR" -C "$rootfs_size_dir"
-  rootfs_size_kib="$(directory_size_kib "$rootfs_size_dir")"
-  if [ -z "$rootfs_size_kib" ] || [ "$rootfs_size_kib" -le 0 ] 2>/dev/null; then
-    echo "Unable to determine extracted size for ROOTFS_TAR: $ROOTFS_TAR" >&2
-    exit 1
-  fi
-  rootfs_size_mib=$(((rootfs_size_kib + 1024 - 1) / 1024))
-  DISKLESS_TMPFS_SIZE_MIB=$((rootfs_size_mib + DISKLESS_TMPFS_MARGIN_MIB))
-fi
-
-if ! [[ "$DISKLESS_TMPFS_MIN_MIB" =~ ^[0-9]+$ ]]; then
-  echo "Invalid DISKLESS_TMPFS_MIN_MIB value: $DISKLESS_TMPFS_MIN_MIB" >&2
-  exit 1
-fi
-
-if [ "$DISKLESS_TMPFS_SIZE_MIB" -lt "$DISKLESS_TMPFS_MIN_MIB" ]; then
-  DISKLESS_TMPFS_SIZE_MIB="$DISKLESS_TMPFS_MIN_MIB"
-fi
-
-if ! [[ "$DISKLESS_TMPFS_SIZE_MIB" =~ ^[0-9]+$ ]] || [ "$DISKLESS_TMPFS_SIZE_MIB" -lt 1 ]; then
-  echo "Invalid DISKLESS_TMPFS_SIZE_MIB value: $DISKLESS_TMPFS_SIZE_MIB" >&2
-  exit 1
-fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
   CONFIG_FILE="$tmp_stage/config.txt"
@@ -417,6 +417,37 @@ EOF
   )
 fi
 
+DEFAULT_EXTLINUX_LABEL="$SINGLE_BOOT_LABEL"
+BOOT_TAR="$tmp_stage/boot.tar"
+RPI_BOOT_TAR="$tmp_stage/rpi-boot.tar"
+MODULES_TAR="$tmp_stage/modules.tar"
+
+if [ -d "$KERNEL_RELEASE_DIR/rootfs/lib/modules" ]; then
+  tar -C "$KERNEL_RELEASE_DIR/rootfs" -cf "$MODULES_TAR" lib/modules
+elif [ -f "$KERNEL_RELEASE_DIR/modules-rootfs.tar" ]; then
+  cp "$KERNEL_RELEASE_DIR/modules-rootfs.tar" "$MODULES_TAR"
+else
+  tar -cf "$MODULES_TAR" --files-from /dev/null
+fi
+
+if [ -z "$DISKLESS_TMPFS_SIZE_MIB" ]; then
+  DISKLESS_TMPFS_SIZE_MIB="$(calculate_diskless_tmpfs_size_mib "$tmp_stage/rootfs-size" "$tmp_stage")"
+fi
+
+if ! [[ "$DISKLESS_TMPFS_MIN_MIB" =~ ^[0-9]+$ ]]; then
+  echo "Invalid DISKLESS_TMPFS_MIN_MIB value: $DISKLESS_TMPFS_MIN_MIB" >&2
+  exit 1
+fi
+
+if [ "$DISKLESS_TMPFS_SIZE_MIB" -lt "$DISKLESS_TMPFS_MIN_MIB" ]; then
+  DISKLESS_TMPFS_SIZE_MIB="$DISKLESS_TMPFS_MIN_MIB"
+fi
+
+if ! [[ "$DISKLESS_TMPFS_SIZE_MIB" =~ ^[0-9]+$ ]] || [ "$DISKLESS_TMPFS_SIZE_MIB" -lt 1 ]; then
+  echo "Invalid DISKLESS_TMPFS_SIZE_MIB value: $DISKLESS_TMPFS_SIZE_MIB" >&2
+  exit 1
+fi
+
 # Keep bootargs intentionally short and put root first.
 # Some U-Boot extlinux paths appear to truncate long APPEND lines.
 CMDLINE_BASE_DEFAULT="${BOARD_KERNEL_CMDLINE_BASE_DEFAULT:-root=PARTLABEL=${ROOTFS_PARTLABEL} rootfstype=ext4 rootwait=30 console=${SERIAL_TTY},${SERIAL_BAUD}n8 nvme_core.default_ps_max_latency_us=0 pcie_aspm=off}"
@@ -445,11 +476,6 @@ INITRD_LINE=""
 if [ "$ENABLE_INITRAMFS_BOOT" = "1" ]; then
   INITRD_LINE="  INITRD /boot/${INITRAMFS_NAME}"
 fi
-
-DEFAULT_EXTLINUX_LABEL="$SINGLE_BOOT_LABEL"
-BOOT_TAR="$tmp_stage/boot.tar"
-RPI_BOOT_TAR="$tmp_stage/rpi-boot.tar"
-MODULES_TAR="$tmp_stage/modules.tar"
 
 case "$BOOT_SCHEME" in
   rockchip-extlinux)
@@ -510,14 +536,6 @@ EOF
     exit 1
     ;;
 esac
-
-if [ -d "$KERNEL_RELEASE_DIR/rootfs/lib/modules" ]; then
-  tar -C "$KERNEL_RELEASE_DIR/rootfs" -cf "$MODULES_TAR" lib/modules
-elif [ -f "$KERNEL_RELEASE_DIR/modules-rootfs.tar" ]; then
-  cp "$KERNEL_RELEASE_DIR/modules-rootfs.tar" "$MODULES_TAR"
-else
-  tar -cf "$MODULES_TAR" --files-from /dev/null
-fi
 
 case "$BOOT_SCHEME" in
   rockchip-extlinux)
