@@ -96,25 +96,10 @@ for req in "${required_inputs[@]}"; do
   fi
 done
 
-file_size_bytes() {
-  local file="$1"
-  stat -c%s "$file" 2>/dev/null || stat -f%z "$file"
+directory_size_kib() {
+  local dir="$1"
+  du -sk "$dir" 2>/dev/null | awk 'NR == 1 {print $1}'
 }
-
-if [ -z "$DISKLESS_TMPFS_SIZE_MIB" ]; then
-  rootfs_tar_bytes="$(file_size_bytes "$ROOTFS_TAR")"
-  if [ -z "$rootfs_tar_bytes" ] || [ "$rootfs_tar_bytes" -le 0 ] 2>/dev/null; then
-    echo "Unable to determine size for ROOTFS_TAR: $ROOTFS_TAR" >&2
-    exit 1
-  fi
-  rootfs_tar_mib=$(((rootfs_tar_bytes + 1024 * 1024 - 1) / (1024 * 1024)))
-  DISKLESS_TMPFS_SIZE_MIB=$((rootfs_tar_mib + DISKLESS_TMPFS_MARGIN_MIB))
-fi
-
-if ! [[ "$DISKLESS_TMPFS_SIZE_MIB" =~ ^[0-9]+$ ]] || [ "$DISKLESS_TMPFS_SIZE_MIB" -lt 1 ]; then
-  echo "Invalid DISKLESS_TMPFS_SIZE_MIB value: $DISKLESS_TMPFS_SIZE_MIB" >&2
-  exit 1
-fi
 
 # libguestfs/supermin requires a host kernel + modules available in the
 # build environment to construct its appliance.
@@ -137,6 +122,24 @@ truncate -s "$IMAGE_SIZE" "$IMAGE_PATH"
 
 tmp_stage="$(mktemp -d)"
 trap 'rm -rf "$tmp_stage"' EXIT
+
+if [ -z "$DISKLESS_TMPFS_SIZE_MIB" ]; then
+  rootfs_size_dir="$tmp_stage/rootfs-size"
+  mkdir -p "$rootfs_size_dir"
+  tar -xf "$ROOTFS_TAR" -C "$rootfs_size_dir"
+  rootfs_size_kib="$(directory_size_kib "$rootfs_size_dir")"
+  if [ -z "$rootfs_size_kib" ] || [ "$rootfs_size_kib" -le 0 ] 2>/dev/null; then
+    echo "Unable to determine extracted size for ROOTFS_TAR: $ROOTFS_TAR" >&2
+    exit 1
+  fi
+  rootfs_size_mib=$(((rootfs_size_kib + 1024 - 1) / 1024))
+  DISKLESS_TMPFS_SIZE_MIB=$((rootfs_size_mib + DISKLESS_TMPFS_MARGIN_MIB))
+fi
+
+if ! [[ "$DISKLESS_TMPFS_SIZE_MIB" =~ ^[0-9]+$ ]] || [ "$DISKLESS_TMPFS_SIZE_MIB" -lt 1 ]; then
+  echo "Invalid DISKLESS_TMPFS_SIZE_MIB value: $DISKLESS_TMPFS_SIZE_MIB" >&2
+  exit 1
+fi
 
 if [ ! -f "$CONFIG_FILE" ]; then
   CONFIG_FILE="$tmp_stage/config.txt"
@@ -374,9 +377,11 @@ else
       tmpfs_opts="\${tmpfs_opts},size=\${diskless_tmpfs_size_mib}m"
     fi
     log "mounting diskless tmpfs: \$tmpfs_opts"
-    \$BB mount -t tmpfs -o "\$tmpfs_opts" tmpfs /newroot
+    \$BB mount -t tmpfs -o "\$tmpfs_opts" tmpfs /newroot || panic "Failed to mount diskless tmpfs: \$tmpfs_opts"
     log "copying rootfs into tmpfs"
-    (cd /media/rootsrc && \$BB tar -cf - .) | (cd /newroot && \$BB tar -xf -)
+    if ! (cd /media/rootsrc && \$BB tar -cf - .) | (cd /newroot && \$BB tar -xf -); then
+      panic "Failed to copy rootfs into diskless tmpfs."
+    fi
     log "rootfs copy complete"
     \$BB mkdir -p /newroot/.diskless-source
     \$BB mount --move /media/rootsrc /newroot/.diskless-source
