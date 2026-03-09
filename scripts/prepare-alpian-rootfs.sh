@@ -217,6 +217,23 @@ read_package_file() {
   done <"$package_file"
 }
 
+decompress_realtek_firmware() {
+  local firmware_dir="$1"
+  local compressed_firmware=""
+
+  [ -d "$firmware_dir" ] || return 0
+  compressed_firmware="$(find "$firmware_dir" -maxdepth 1 -type f -name '*.fw.zst' | sort || true)"
+  [ -n "$compressed_firmware" ] || return 0
+
+  require_cmd zstd
+  while IFS= read -r firmware_file; do
+    [ -n "$firmware_file" ] || continue
+    zstd -d -q -f -o "${firmware_file%.zst}" "$firmware_file"
+  done <<EOF
+$compressed_firmware
+EOF
+}
+
 package_file_has_entries() {
   local package_file="$1"
   [ -f "$package_file" ] || return 1
@@ -293,6 +310,11 @@ printf '  - %s\n' "${package_args[@]}"
   --cache-dir "$APK_CACHE_DIR" \
   --no-scripts \
   add "${package_args[@]}"
+
+# Alpine firmware subpackages commonly ship compressed .fw.zst blobs. The
+# FriendlyElec/Radxa vendor kernels used here request plain .fw names and can
+# stall in the sysfs fallback path if only compressed Realtek blobs are present.
+decompress_realtek_firmware "$ROOTFS_DIR/usr/lib/firmware/rtl_nic"
 
 if [ -n "$MOTD_TEMPLATE_FILE" ]; then
   if [ ! -f "$MOTD_TEMPLATE_FILE" ]; then
