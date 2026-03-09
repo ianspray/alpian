@@ -1,4 +1,5 @@
 # Board-specific custom package overlay for NanoPi R3S.
 # These entries are appended after boards/alpian/alpine/custom-packages.txt.
 #
+r3s-mac-services
 r3s-usb-updater-services
