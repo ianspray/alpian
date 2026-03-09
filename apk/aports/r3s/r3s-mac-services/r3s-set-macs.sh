@@ -34,17 +34,38 @@ increment_mac() {
   b4=$((0x$4))
   b5=$((0x$5))
   b6=$((0x$6))
+  carry="$delta"
 
-  value=$((((((((((b1 << 8) | b2) << 8) | b3) << 8) | b4) << 8) | b5) << 8) | b6))
-  value=$(((value + delta) & 0xffffffffffff))
+  b6=$((b6 + carry))
+  carry=$((b6 / 256))
+  b6=$((b6 % 256))
+
+  b5=$((b5 + carry))
+  carry=$((b5 / 256))
+  b5=$((b5 % 256))
+
+  b4=$((b4 + carry))
+  carry=$((b4 / 256))
+  b4=$((b4 % 256))
+
+  b3=$((b3 + carry))
+  carry=$((b3 / 256))
+  b3=$((b3 % 256))
+
+  b2=$((b2 + carry))
+  carry=$((b2 / 256))
+  b2=$((b2 % 256))
+
+  b1=$((b1 + carry))
+  b1=$((b1 % 256))
 
   printf '%02x:%02x:%02x:%02x:%02x:%02x\n' \
-    $(((value >> 40) & 0xff)) \
-    $(((value >> 32) & 0xff)) \
-    $(((value >> 24) & 0xff)) \
-    $(((value >> 16) & 0xff)) \
-    $(((value >> 8) & 0xff)) \
-    $((value & 0xff))
+    "$b1" \
+    "$b2" \
+    "$b3" \
+    "$b4" \
+    "$b5" \
+    "$b6"
 }
 
 set_iface_mac() {
