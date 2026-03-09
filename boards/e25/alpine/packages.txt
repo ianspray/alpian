@@ -1,0 +1,5 @@
+# Board-specific package overlay for E25.
+# These entries are appended after boards/alpian/alpine/packages.txt.
+
+e25-openrc-services
+e25-usb-updater-services

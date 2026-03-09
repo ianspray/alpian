@@ -15,6 +15,8 @@ Select a board with `BOARD=<name>` (default: `e54c`).
 Supported board profiles:
 
 - `e54c`
+- `e52c`
+- `e25`
 - `rock5b`
 - `rock3b`
 - `r3s`
@@ -33,6 +35,8 @@ Equivalent:
 
 ```bash
 make BOARD=e54c main-image
+make BOARD=e52c main-image
+make BOARD=e25 main-image
 make BOARD=rock5b main-image
 make BOARD=rock3b main-image
 make BOARD=r3s main-image

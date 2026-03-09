@@ -3,6 +3,8 @@
 ## Stack
 - Different AArch64 Single Board Computers, eg:
   - Radxa E54C
+  - Radxa E52C
+  - Radxa E25
   - Radxa Rock5B
   - Radxa Rock3B
   - FriendlyElec NanoPi R3S

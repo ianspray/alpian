@@ -23,6 +23,9 @@ UBOOT_FETCH_MODE="${UBOOT_FETCH_MODE:-spi-image}"
 SPI_BASE_IMAGE_FILENAME="${SPI_BASE_IMAGE_FILENAME:-${BOARD_SPI_BASE_IMAGE_FILENAME_DEFAULT:-radxa-$BOARD-spi-base.img}}"
 SPI_BASE_IMAGE_URL="${SPI_BASE_IMAGE_URL:-${BOARD_SPI_BASE_IMAGE_URL_DEFAULT:-}}"
 SPI_BASE_IMAGE_PATH="${SPI_BASE_IMAGE_PATH:-$DOWNLOAD_DIR/$SPI_BASE_IMAGE_FILENAME}"
+DISK_IMAGE_FILENAME="${DISK_IMAGE_FILENAME:-${BOARD_DISK_IMAGE_FILENAME_DEFAULT:-}}"
+DISK_IMAGE_URL="${DISK_IMAGE_URL:-${BOARD_DISK_IMAGE_URL_DEFAULT:-}}"
+DISK_IMAGE_PATH="${DISK_IMAGE_PATH:-${DISK_IMAGE_FILENAME:+$DOWNLOAD_DIR/$DISK_IMAGE_FILENAME}}"
 SPI_IMAGE_SIZE_BYTES="${SPI_IMAGE_SIZE_BYTES:-${BOARD_SPI_IMAGE_SIZE_BYTES_DEFAULT:-16777216}}"
 SPI_IDBLOADER_LBA="${SPI_IDBLOADER_LBA:-${BOARD_SPI_IDBLOADER_LBA_DEFAULT:-64}}"
 SPI_UBOOT_ITB_LBA="${SPI_UBOOT_ITB_LBA:-${BOARD_SPI_UBOOT_ITB_LBA_DEFAULT:-16384}}"
@@ -42,7 +45,7 @@ usage() {
   cat <<'EOF'
 Usage: scripts/fetch-uboot-reference-assets.sh [--force-download] [--force-overwrite]
 
-Downloads board SPI image and extracts:
+Downloads a board bootloader source image/archive and extracts:
   - idbloader.img
   - u-boot.itb
 
@@ -56,6 +59,9 @@ Environment overrides:
   SPI_BASE_IMAGE_URL
   SPI_BASE_IMAGE_FILENAME
   SPI_BASE_IMAGE_PATH
+  DISK_IMAGE_URL
+  DISK_IMAGE_FILENAME
+  DISK_IMAGE_PATH
   SPI_IMAGE_SIZE_BYTES
   SPI_IDBLOADER_LBA
   SPI_UBOOT_ITB_LBA
@@ -100,6 +106,11 @@ case "$UBOOT_FETCH_MODE" in
   spi-image)
     require_cmd dd
     require_cmd truncate
+    ;;
+  compressed-disk-image)
+    require_cmd dd
+    require_cmd truncate
+    require_cmd xz
     ;;
   archive-members)
     require_cmd tar
@@ -199,6 +210,34 @@ extract_from_spi_image() {
   echo "Installed from SPI image: $target_path"
 }
 
+extract_from_compressed_disk_image() {
+  local asset_name="$1"
+  local lba="$2"
+  local size_bytes="$3"
+  local target_path="$UBOOT_ASSETS_DIR/$asset_name"
+  local sectors=0
+
+  if [ -f "$target_path" ] && [ "$FORCE_OVERWRITE" -ne 1 ]; then
+    echo "Keeping existing asset: $target_path"
+    return 0
+  fi
+
+  if [ -z "$DISK_IMAGE_PATH" ]; then
+    echo "Compressed disk image mode requires DISK_IMAGE_PATH or DISK_IMAGE_FILENAME for BOARD=$BOARD." >&2
+    return 1
+  fi
+
+  if ! download_source_if_needed "$DISK_IMAGE_URL" "$DISK_IMAGE_PATH" "compressed-disk-image"; then
+    return 1
+  fi
+
+  sectors=$(((size_bytes + 511) / 512))
+  xz -dc "$DISK_IMAGE_PATH" | dd of="$target_path" bs=512 skip="$lba" count="$sectors" status=none
+  truncate -s "$size_bytes" "$target_path"
+  chmod 0644 "$target_path"
+  echo "Installed from compressed disk image: $target_path"
+}
+
 extract_from_archive_member() {
   local asset_name="$1"
   local archive_member="$2"
@@ -238,6 +277,15 @@ case "$UBOOT_FETCH_MODE" in
 
     if [ ! -f "$UBOOT_ASSETS_DIR/u-boot.itb" ] || [ "$FORCE_OVERWRITE" -eq 1 ]; then
       extract_from_spi_image "u-boot.itb" "$SPI_UBOOT_ITB_LBA" "$UBOOT_ITB_SIZE_BYTES"
+    fi
+    ;;
+  compressed-disk-image)
+    if [ ! -f "$UBOOT_ASSETS_DIR/idbloader.img" ] || [ "$FORCE_OVERWRITE" -eq 1 ]; then
+      extract_from_compressed_disk_image "idbloader.img" "$SPI_IDBLOADER_LBA" "$IDBLOADER_SIZE_BYTES"
+    fi
+
+    if [ ! -f "$UBOOT_ASSETS_DIR/u-boot.itb" ] || [ "$FORCE_OVERWRITE" -eq 1 ]; then
+      extract_from_compressed_disk_image "u-boot.itb" "$SPI_UBOOT_ITB_LBA" "$UBOOT_ITB_SIZE_BYTES"
     fi
     ;;
   archive-members)

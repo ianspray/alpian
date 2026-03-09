@@ -1,0 +1,5 @@
+# Board-specific custom package overlay for E52C.
+# These entries are appended after boards/alpian/alpine/custom-packages.txt.
+#
+e52c-openrc-services
+e52c-usb-updater-services
