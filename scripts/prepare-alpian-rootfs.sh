@@ -383,6 +383,7 @@ cat >"$ROOTFS_DIR/etc/inittab" <<EOF
 ::sysinit:/sbin/openrc boot
 ::wait:/sbin/openrc default
 
+::once:/bin/sh -c 'if [ -c /dev/${SERIAL_TTY} ] && [ -f /etc/motd ]; then cat /etc/motd > /dev/${SERIAL_TTY} 2>/dev/null || true; printf "\n" > /dev/${SERIAL_TTY} 2>/dev/null || true; fi'
 ${SERIAL_TTY}::respawn:/sbin/getty -L ${SERIAL_BAUD} ${SERIAL_TTY} ${SERIAL_TERM}
 
 ::ctrlaltdel:/sbin/reboot
