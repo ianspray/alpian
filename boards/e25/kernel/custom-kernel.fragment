@@ -16,3 +16,11 @@ CONFIG_MMC_SDHCI_PLTFM=y
 CONFIG_PCI=y
 CONFIG_PCIE_DW_ROCKCHIP=y
 CONFIG_R8169=y
+
+# Disable vendor Mali drivers/embedded CSF firmware.
+# The Radxa tree expects drivers/gpu/arm/bifrost/mali_csffw.bin when enabled.
+# CONFIG_MALI400 is not set
+# CONFIG_MALI450 is not set
+# CONFIG_MALI_MIDGARD is not set
+# CONFIG_MALI_BIFROST is not set
+# CONFIG_MALI_CSF_INCLUDE_FW is not set
