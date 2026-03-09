@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # SPDX-License-Identifier: MIT
-# Disable NPU nodes in the FriendlyElec RK3566 DTB for NanoPi R3S.
+# Disable unsupported nodes in the FriendlyElec RK3566 DTB for NanoPi R3S.
 # The R3S has no NPU voltage supply; leaving NPU nodes enabled causes
 # the rk_iommu driver to trigger a kernel panic during PM domain powerup.
+# The headless Alpian profile also wants the display/HDMI stack disabled so
+# DRM does not steal the console or bring up unused display hardware.
 #
 # Uses dtc to decompile/recompile the DTB so nodes are found by compatible
 # string and label pattern rather than by hardcoded addresses (which differ
@@ -38,11 +40,31 @@ for line in orig_lines:
         elif ch == '}':
             d -= 1
 
-# Identify NPU-related node start lines by two criteria:
-#   (a) compatible property contains an NPU-related substring
-#   (b) node header (label + name) contains the word 'npu'
-#       — catches "rknpu_mmu: iommu@..." whose compatible is generic
-TARGET_COMPATS = ('rknpu', 'rockchip,rk3568-rknpu', 'rockchip,rk3566-rknpu')
+# Identify target node start lines by two criteria:
+#   (a) compatible property contains a target substring
+#   (b) node header (label + name) contains a target keyword
+#
+# This catches cases where a child node's compatible is generic but its label
+# or node name still identifies it as board-specific plumbing.
+TARGET_RULES = (
+    (
+        'npu',
+        ('rknpu', 'rockchip,rk3568-rknpu', 'rockchip,rk3566-rknpu'),
+        ('npu',),
+    ),
+    (
+        'display',
+        (
+            'rockchip,display-subsystem',
+            'rockchip,dw-hdmi',
+            'rockchip,hdmi',
+            'rockchip,vop',
+            'rockchip,vop2',
+            'hdmi-connector',
+        ),
+        ('display-subsystem', 'vop', 'hdmi', 'route-hdmi'),
+    ),
+)
 nodes_to_disable = set()  # original line indices of node-opening lines
 
 for i, line in enumerate(orig_lines):
@@ -50,19 +72,23 @@ for i, line in enumerate(orig_lines):
 
     # (a) compatible property match
     if re.match(r'compatible\s*=', stripped):
-        if any(tc in stripped for tc in TARGET_COMPATS):
-            for j in range(i - 1, -1, -1):
-                if depths[j] < depths[i] and '{' in orig_lines[j]:
-                    nodes_to_disable.add(j)
-                    break
+        for _, compat_terms, _ in TARGET_RULES:
+            if any(term in stripped for term in compat_terms):
+                for j in range(i - 1, -1, -1):
+                    if depths[j] < depths[i] and '{' in orig_lines[j]:
+                        nodes_to_disable.add(j)
+                        break
         continue
 
-    # (b) node header line containing 'npu' (word boundary)
+    # (b) node header line containing one of the target keywords
     if '{' not in stripped or '=' in stripped.split('{')[0]:
         continue
     header = stripped.split('{')[0]
-    if re.search(r'\bnpu\b', header, re.IGNORECASE):
-        nodes_to_disable.add(i)
+    lowered_header = header.lower()
+    for _, _, header_terms in TARGET_RULES:
+        if any(term in lowered_header for term in header_terms):
+            nodes_to_disable.add(i)
+            break
 
 if not nodes_to_disable:
     print('  No NPU nodes found to disable.', file=sys.stderr)

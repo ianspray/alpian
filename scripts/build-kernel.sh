@@ -280,6 +280,16 @@ build_from_radxa_source() {
     exit 1
   fi
 
+  if [ -n "${FE_IMAGE_DTB_PATCH_SCRIPT:-}" ] && [ -x "$FE_IMAGE_DTB_PATCH_SCRIPT" ]; then
+    echo "Applying board DTB patches via: $FE_IMAGE_DTB_PATCH_SCRIPT"
+    for dtb in $KERNEL_DTBS; do
+      dtb_path="$RELEASE_DIR/boot/dtbs/$KERNEL_DTB_SUBDIR/$dtb"
+      if [ -f "$dtb_path" ]; then
+        "$FE_IMAGE_DTB_PATCH_SCRIPT" "$dtb_path"
+      fi
+    done
+  fi
+
   if [[ " $BUILD_TARGETS " == *" modules "* ]]; then
     if [ "$CASE_INSENSITIVE_WORKSPACE" -eq 1 ]; then
       modules_stage="$(mktemp -d)"
