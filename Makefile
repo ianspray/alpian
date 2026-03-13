@@ -87,6 +87,8 @@ $(APK_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	  printf '%s\0' \
 	    scripts/build-apk-repo.sh \
 	    scripts/check-tooling.sh \
+	    scripts/lib/cache.sh \
+	    containers/apk-builder/Containerfile \
 	    assets/reference/alpine/custom-packages.txt \
 	    assets/reference/alpine/custom-repositories.txt; \
 	  if [ -d "$(CUSTOM_APK_KEYS_DIR_FOR_HASH)" ]; then \
@@ -101,7 +103,8 @@ $(KERNEL_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	    $(BOARD_DIR)/board.env \
 	    scripts/build-kernel.sh \
 	    scripts/fetch-radxa-kernel.sh \
-	    scripts/check-tooling.sh; \
+	    scripts/check-tooling.sh \
+	    scripts/lib/cache.sh; \
 	  if [ -f "$(BOARD_DIR)/kernel/custom-kernel.fragment" ]; then \
 	    printf '%s\0' "$(BOARD_DIR)/kernel/custom-kernel.fragment"; \
 	  fi; \
@@ -120,6 +123,7 @@ $(ROOTFS_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	    $(BOARD_DIR)/board.env \
 	    scripts/prepare-alpian-rootfs.sh \
 	    scripts/check-tooling.sh \
+	    scripts/lib/cache.sh \
 	    assets/reference/alpine/custom-repositories.txt \
 	    assets/reference/alpine/motd-main \
 	    assets/reference/alpine/motd-updater; \
@@ -159,7 +163,8 @@ $(UBOOT_INPUTS_HASH): FORCE | $(STAMPS_DIR)
 	  printf '%s\0' \
 	    $(BOARD_DIR)/board.env \
 	    scripts/fetch-uboot-reference-assets.sh \
-	    scripts/check-tooling.sh; \
+	    scripts/check-tooling.sh \
+	    scripts/lib/cache.sh; \
 	  if [ -f "$(BOARD_DIR)/u-boot-fetch.env" ]; then \
 	    printf '%s\0' "$(BOARD_DIR)/u-boot-fetch.env"; \
 	  fi; \

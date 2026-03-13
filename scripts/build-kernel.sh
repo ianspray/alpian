@@ -9,7 +9,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/board-config.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/cache.sh"
 load_board_config
+cache_init
 
 KERNEL_DIR_WAS_SET="${KERNEL_DIR+x}"
 OUT_DIR_WAS_SET="${OUT_DIR+x}"
@@ -33,8 +36,6 @@ KERNEL_SOURCE_MODE="${KERNEL_SOURCE_MODE:-${BOARD_KERNEL_SOURCE_MODE:-radxa-git}
 RPI_IMAGE_URL="${RPI_IMAGE_URL:-${BOARD_RPI_RELEASE_IMAGE_URL_DEFAULT:-}}"
 RPI_IMAGE_FILENAME="${RPI_IMAGE_FILENAME:-${BOARD_RPI_RELEASE_IMAGE_FILENAME_DEFAULT:-}}"
 RPI_IMAGE_EXTRACT_MODE="${RPI_IMAGE_EXTRACT_MODE:-auto}"
-DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
-
 FE_IMAGE_ARCHIVE_URL="${FE_IMAGE_ARCHIVE_URL:-${BOARD_FRIENDLYELEC_IMAGE_ARCHIVE_URL:-}}"
 FE_IMAGE_ARCHIVE_FILENAME="${FE_IMAGE_ARCHIVE_FILENAME:-${BOARD_FRIENDLYELEC_IMAGE_ARCHIVE_FILENAME:-}}"
 FE_IMAGE_KERNEL_MEMBER="${FE_IMAGE_KERNEL_MEMBER:-${BOARD_FRIENDLYELEC_IMAGE_KERNEL_MEMBER:-}}"
@@ -374,8 +375,7 @@ build_from_alpine_rpi_image() {
   fi
 
   if [ ! -f "$compressed_path" ]; then
-    echo "Downloading Alpine RPi image: $RPI_IMAGE_URL"
-    curl -fL --retry 3 --retry-delay 2 "$RPI_IMAGE_URL" -o "$compressed_path"
+    download_cached_url "$RPI_IMAGE_URL" "$compressed_path" "Alpine RPi image"
   else
     echo "Using existing Alpine RPi image download: $compressed_path"
   fi
@@ -502,8 +502,7 @@ build_from_friendlyelec_image() {
 
   local archive_path="$DOWNLOAD_DIR/$fe_archive_filename"
   if [ ! -f "$archive_path" ]; then
-    echo "Downloading FriendlyElec image assets: $fe_archive_url"
-    curl -fL --retry 3 --retry-delay 2 "$fe_archive_url" -o "$archive_path"
+    download_cached_url "$fe_archive_url" "$archive_path" "FriendlyElec image assets"
   else
     echo "Using existing FriendlyElec image archive: $archive_path"
   fi

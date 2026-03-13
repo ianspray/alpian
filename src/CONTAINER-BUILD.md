@@ -58,7 +58,29 @@ This will:
 4. Write artifacts to host `build/` through the bind mount.
 5. Use `BOARD` from the host environment (default: `e54c`).
 
+Because the repo is bind-mounted into the builder, the shared fetch cache at `build/cache/` also persists across container runs on macOS/Linux hosts.
+
 ## Common Commands
+
+Preferred partial-build pattern:
+
+```bash
+scripts/build-alpian-in-container.sh -- make <target>
+```
+
+This keeps the container workflow aligned with the `Makefile` dependency graph and stamp/hash reuse. Direct script invocation inside the container is still possible, but it bypasses `make` target handling and should only be used when you intentionally want to force a script to run.
+
+Build APK repository only:
+
+```bash
+scripts/build-alpian-in-container.sh -- make apk-repo
+```
+
+Build rootfs only:
+
+```bash
+scripts/build-alpian-in-container.sh -- make rootfs
+```
 
 Build main image only:
 

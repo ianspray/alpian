@@ -7,10 +7,15 @@ export PATH="$PATH:/usr/sbin:/sbin"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/cache.sh"
+cache_init
+
 UBOOT_REPO="${UBOOT_REPO:-https://github.com/radxa/u-boot.git}"
 UBOOT_BRANCH="${UBOOT_BRANCH:-next-dev-v2024.10}"
 UBOOT_DEFCONFIG="${UBOOT_DEFCONFIG:-radxa-e54c-spi-rk3588s_defconfig}"
 UBOOT_WORKDIR="${UBOOT_WORKDIR:-$REPO_ROOT/build/u-boot-src/radxa-u-boot}"
+UBOOT_MIRROR_DIR="${UBOOT_MIRROR_DIR:-$(git_mirror_dir_for_repo "$UBOOT_REPO")}"
 DEFAULT_PATCH_FILE="$REPO_ROOT/boards/e54c/u-boot/patches/0001-e54c-enable-usb-host-in-uboot-dts.patch"
 LEGACY_PATCH_FILE="$REPO_ROOT/assets/reference/u-boot/patches/0001-e54c-enable-usb-host-in-uboot-dts.patch"
 PATCH_FILE="${PATCH_FILE:-$DEFAULT_PATCH_FILE}"
@@ -24,7 +29,7 @@ SPI_IMAGE_STRATEGY="${SPI_IMAGE_STRATEGY:-base-image}"
 SPI_UBOOT_SOURCE="${SPI_UBOOT_SOURCE:-base}"
 SPI_FDT_SOURCE="${SPI_FDT_SOURCE:-build}"
 SPI_BASE_IMAGE_URL="${SPI_BASE_IMAGE_URL:-https://dl.radxa.com/e/e54c/images/radxa-e54c-spi-flash-image-20250620.img}"
-SPI_BASE_IMAGE_PATH="${SPI_BASE_IMAGE_PATH:-$REPO_ROOT/build/downloads/radxa-e54c-spi-flash-image-20250620.img}"
+SPI_BASE_IMAGE_PATH="${SPI_BASE_IMAGE_PATH:-$DOWNLOAD_DIR/radxa-e54c-spi-flash-image-20250620.img}"
 
 if [ "$PATCH_FILE" = "$DEFAULT_PATCH_FILE" ] && [ ! -f "$PATCH_FILE" ] && [ -f "$LEGACY_PATCH_FILE" ]; then
   PATCH_FILE="$LEGACY_PATCH_FILE"
@@ -92,12 +97,9 @@ fit_find_load_addr() {
 
 mkdir -p "$(dirname "$UBOOT_WORKDIR")" "$OUT_ROOT"
 
-if [ ! -d "$UBOOT_WORKDIR/.git" ]; then
-  git clone "$UBOOT_REPO" "$UBOOT_WORKDIR"
-fi
-
-git -C "$UBOOT_WORKDIR" fetch --tags origin
-git -C "$UBOOT_WORKDIR" checkout -B "$UBOOT_BRANCH" "origin/$UBOOT_BRANCH"
+ensure_git_mirror "$UBOOT_REPO" "$UBOOT_MIRROR_DIR" "$UBOOT_BRANCH"
+echo "Syncing U-Boot checkout from cached mirror into $UBOOT_WORKDIR"
+sync_git_checkout_from_cache "$UBOOT_REPO" "$UBOOT_BRANCH" "$UBOOT_WORKDIR" "$UBOOT_MIRROR_DIR"
 # Ensure re-runs start from a clean DTS state before applying the USB patch.
 git -C "$UBOOT_WORKDIR" checkout -- arch/arm/dts/rk3588s-radxa-e54c.dts
 
@@ -160,8 +162,7 @@ if [ -n "$FIT_REPACK_REASON" ]; then
 
   mkdir -p "$(dirname "$SPI_BASE_IMAGE_PATH")"
   if [ ! -f "$SPI_BASE_IMAGE_PATH" ]; then
-    echo "Downloading base SPI image: $SPI_BASE_IMAGE_URL"
-    curl -fL "$SPI_BASE_IMAGE_URL" -o "$SPI_BASE_IMAGE_PATH"
+    download_cached_url "$SPI_BASE_IMAGE_URL" "$SPI_BASE_IMAGE_PATH" "base SPI image"
   fi
 
   repack_dir="$(mktemp -d)"
@@ -326,8 +327,7 @@ SPI_IMAGE_SOURCE_SHA256=""
 if [ "$SPI_IMAGE_STRATEGY" = "base-image" ]; then
   mkdir -p "$(dirname "$SPI_BASE_IMAGE_PATH")"
   if [ ! -f "$SPI_BASE_IMAGE_PATH" ]; then
-    echo "Downloading base SPI image: $SPI_BASE_IMAGE_URL"
-    curl -fL "$SPI_BASE_IMAGE_URL" -o "$SPI_BASE_IMAGE_PATH"
+    download_cached_url "$SPI_BASE_IMAGE_URL" "$SPI_BASE_IMAGE_PATH" "base SPI image"
   fi
   base_size="$(stat -c%s "$SPI_BASE_IMAGE_PATH")"
   if [ "$base_size" -ne "$SPI_IMAGE_SIZE_BYTES" ]; then

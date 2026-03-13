@@ -9,7 +9,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/board-config.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/cache.sh"
 load_board_config
+cache_init
 
 KERNEL_REPO="${KERNEL_REPO:-${BOARD_KERNEL_REPO_DEFAULT:-https://github.com/radxa/kernel.git}}"
 KERNEL_BRANCH="${KERNEL_BRANCH:-${BOARD_KERNEL_BRANCH_DEFAULT:-linux-6.1-stan-rkr5.1}}"
@@ -17,22 +20,11 @@ KERNEL_DIR="${KERNEL_DIR:-$REPO_ROOT/src/radxa-kernel-$BOARD}"
 KERNEL_EXPECTED_DTS="${KERNEL_EXPECTED_DTS:-$BOARD_KERNEL_EXPECTED_DTS}"
 KERNEL_PATCH_DIR="${KERNEL_PATCH_DIR:-${BOARD_KERNEL_PATCH_DIR:-$REPO_ROOT/boards/$BOARD/kernel/patches}}"
 KERNEL_PREPARE_SCRIPT="${KERNEL_PREPARE_SCRIPT:-${BOARD_KERNEL_PREPARE_SCRIPT:-}}"
+KERNEL_MIRROR_DIR="${KERNEL_MIRROR_DIR:-$(git_mirror_dir_for_repo "$KERNEL_REPO")}"
 
-if [ -d "$KERNEL_DIR/.git" ]; then
-  echo "Refreshing existing kernel checkout in $KERNEL_DIR"
-  current_origin="$(git -C "$KERNEL_DIR" remote get-url origin 2>/dev/null || true)"
-  if [ -n "$current_origin" ] && [ "$current_origin" != "$KERNEL_REPO" ]; then
-    echo "Updating kernel remote origin:"
-    echo "  old: $current_origin"
-    echo "  new: $KERNEL_REPO"
-    git -C "$KERNEL_DIR" remote set-url origin "$KERNEL_REPO"
-  fi
-  git -C "$KERNEL_DIR" fetch --depth 1 origin "$KERNEL_BRANCH"
-  git -C "$KERNEL_DIR" checkout -f -B "$KERNEL_BRANCH" "origin/$KERNEL_BRANCH"
-else
-  echo "Cloning $KERNEL_REPO ($KERNEL_BRANCH) into $KERNEL_DIR"
-  git clone --depth 1 --branch "$KERNEL_BRANCH" "$KERNEL_REPO" "$KERNEL_DIR"
-fi
+ensure_git_mirror "$KERNEL_REPO" "$KERNEL_MIRROR_DIR" "$KERNEL_BRANCH"
+echo "Syncing kernel checkout from cached mirror into $KERNEL_DIR"
+sync_git_checkout_from_cache "$KERNEL_REPO" "$KERNEL_BRANCH" "$KERNEL_DIR" "$KERNEL_MIRROR_DIR"
 
 if [ -d "$KERNEL_PATCH_DIR" ]; then
   shopt -s nullglob

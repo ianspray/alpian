@@ -5,16 +5,23 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/cache.sh"
+cache_init
+
 APK_APORTS_ROOT="${APK_APORTS_ROOT:-$REPO_ROOT/apk/aports}"
 APK_REPO_BRANCH="${APK_REPO_BRANCH:-v3.23}"
 APK_ARCH="${APK_ARCH:-aarch64}"
 APK_REPO_OUT="${APK_REPO_OUT:-$REPO_ROOT/build/apk-repo}"
 APK_KEYS_DIR="${APK_KEYS_DIR:-$REPO_ROOT/build/apk-keys}"
 APK_KEYS_EXPORT_DIR="${APK_KEYS_EXPORT_DIR:-$REPO_ROOT/assets/reference/alpine/custom-keys}"
-APK_PODMAN_IMAGE="${APK_PODMAN_IMAGE:-docker.io/library/alpine:3.23}"
 APK_PODMAN_ARCH="${APK_PODMAN_ARCH:-}"
 APK_PODMAN_NETWORK="${APK_PODMAN_NETWORK:-host}"
+APK_PODMAN_IMAGE_FILE="${APK_PODMAN_IMAGE_FILE:-$REPO_ROOT/containers/apk-builder/Containerfile}"
+APK_CACHE_DIR="${APK_CACHE_DIR:-$CACHE_ROOT/apk}"
+DISTFILES_CACHE_DIR="${DISTFILES_CACHE_DIR:-$CACHE_ROOT/distfiles}"
 APK_REFRESH_CHECKSUMS="${APK_REFRESH_CHECKSUMS:-1}"
+APK_REBUILD_IMAGE="${APK_REBUILD_IMAGE:-0}"
 APK_RETRY_COUNT="${APK_RETRY_COUNT:-5}"
 APK_RETRY_DELAY_SEC="${APK_RETRY_DELAY_SEC:-3}"
 
@@ -30,6 +37,9 @@ if [ -z "$APK_PODMAN_ARCH" ]; then
   esac
 fi
 
+default_builder_image="localhost/alpian-apk-builder:3.23-${APK_PODMAN_ARCH}"
+APK_PODMAN_IMAGE="${APK_PODMAN_IMAGE:-$default_builder_image}"
+
 require_cmd() {
   local cmd="$1"
   if ! command -v "$cmd" >/dev/null 2>&1; then
@@ -41,6 +51,7 @@ require_cmd() {
 require_cmd podman
 require_cmd find
 require_cmd sort
+require_cmd sha256sum
 
 retry_cmd() {
   local tries="$1"
@@ -60,6 +71,43 @@ retry_cmd() {
   done
 }
 
+ensure_builder_image() {
+  if [ -z "$APK_PODMAN_IMAGE_FILE" ]; then
+    return 0
+  fi
+
+  if [ ! -f "$APK_PODMAN_IMAGE_FILE" ]; then
+    echo "APK_PODMAN_IMAGE_FILE does not exist: $APK_PODMAN_IMAGE_FILE" >&2
+    exit 1
+  fi
+
+  local builder_context builder_sha current_sha current_arch
+  local needs_build=0
+
+  builder_context="$(dirname "$APK_PODMAN_IMAGE_FILE")"
+  builder_sha="$(sha256sum "$APK_PODMAN_IMAGE_FILE" | awk '{print $1}')"
+
+  if [ "$APK_REBUILD_IMAGE" = "1" ] || ! podman image inspect "$APK_PODMAN_IMAGE" >/dev/null 2>&1; then
+    needs_build=1
+  else
+    current_sha="$(podman image inspect --format '{{ index .Config.Labels "io.alpian.builderfile-sha" }}' "$APK_PODMAN_IMAGE" 2>/dev/null || true)"
+    current_arch="$(podman image inspect --format '{{ .Architecture }}' "$APK_PODMAN_IMAGE" 2>/dev/null || true)"
+    if [ "$current_sha" != "$builder_sha" ] || [ "$current_arch" != "$APK_PODMAN_ARCH" ]; then
+      needs_build=1
+    fi
+  fi
+
+  if [ "$needs_build" -eq 1 ]; then
+    echo "Building APK builder image: $APK_PODMAN_IMAGE"
+    podman build \
+      --arch "$APK_PODMAN_ARCH" \
+      --label "io.alpian.builderfile-sha=$builder_sha" \
+      -f "$APK_PODMAN_IMAGE_FILE" \
+      -t "$APK_PODMAN_IMAGE" \
+      "$builder_context"
+  fi
+}
+
 if [ ! -d "$APK_APORTS_ROOT" ]; then
   echo "APK_APORTS_ROOT does not exist: $APK_APORTS_ROOT" >&2
   exit 1
@@ -75,10 +123,11 @@ echo "Building custom APK repository"
 echo "  APKBUILD count: ${#apkbuild_files[@]}"
 echo "  Branch/arch:    ${APK_REPO_BRANCH}/${APK_ARCH}"
 echo "  Container arch: ${APK_PODMAN_ARCH}"
+echo "  Builder image:  ${APK_PODMAN_IMAGE}"
 echo "  Refresh sums:   ${APK_REFRESH_CHECKSUMS}"
 echo "  Output:         ${APK_REPO_OUT}"
 
-mkdir -p "$APK_REPO_OUT" "$APK_KEYS_DIR" "$APK_KEYS_EXPORT_DIR"
+mkdir -p "$APK_REPO_OUT" "$APK_KEYS_DIR" "$APK_KEYS_EXPORT_DIR" "$APK_CACHE_DIR" "$DISTFILES_CACHE_DIR"
 chmod 0777 "$APK_REPO_OUT" "$APK_KEYS_DIR"
 
 repo_arch_dir="$APK_REPO_OUT/$APK_REPO_BRANCH/$APK_ARCH"
@@ -88,9 +137,10 @@ rm -f "$repo_arch_dir"/*.apk "$repo_arch_dir"/APKINDEX.tar.gz "$repo_arch_dir"/A
 CONTAINER_SCRIPT='set -euo pipefail
 
 retry_apk() {
-  tries="${APK_RETRY_COUNT:-5}"
-  delay="${APK_RETRY_DELAY_SEC:-3}"
-  attempt=1
+  local tries="${APK_RETRY_COUNT:-5}"
+  local delay="${APK_RETRY_DELAY_SEC:-3}"
+  local attempt=1
+
   while true; do
     if apk "$@"; then
       return 0
@@ -104,13 +154,10 @@ retry_apk() {
   done
 }
 
+mkdir -p /var/cache/apk /var/cache/distfiles
+rm -rf /etc/apk/cache
+ln -snf /var/cache/apk /etc/apk/cache
 retry_apk update
-retry_apk add alpine-sdk bash
-
-if ! id builder >/dev/null 2>&1; then
-  adduser -D builder
-fi
-addgroup builder abuild >/dev/null 2>&1 || true
 
 install -d -m 700 -o builder -g builder /home/builder/.abuild
 install -d -m 0777 /work/out /work/keys
@@ -169,6 +216,8 @@ cp -f /home/builder/.abuild/*.rsa.pub /work/out/keys/
 cp -f /home/builder/.abuild/*.rsa.pub /work/keys/
 '
 
+ensure_builder_image
+
 retry_cmd "$APK_RETRY_COUNT" "$APK_RETRY_DELAY_SEC" \
   podman run --rm \
     --arch "$APK_PODMAN_ARCH" \
@@ -181,6 +230,8 @@ retry_cmd "$APK_RETRY_COUNT" "$APK_RETRY_DELAY_SEC" \
     -v "$APK_APORTS_ROOT:/work/aports:ro" \
     -v "$APK_REPO_OUT:/work/out" \
     -v "$APK_KEYS_DIR:/work/keys" \
+    -v "$APK_CACHE_DIR:/var/cache/apk" \
+    -v "$DISTFILES_CACHE_DIR:/var/cache/distfiles" \
     "$APK_PODMAN_IMAGE" \
     sh -c "$CONTAINER_SCRIPT"
 

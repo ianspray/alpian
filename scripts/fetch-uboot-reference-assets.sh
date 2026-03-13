@@ -9,7 +9,10 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/board-config.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/cache.sh"
 load_board_config
+cache_init
 
 UBOOT_FETCH_PROFILE="${UBOOT_FETCH_PROFILE:-${BOARD_UBOOT_FETCH_PROFILE:-$REPO_ROOT/boards/$BOARD/u-boot-fetch.env}}"
 if [ -f "$UBOOT_FETCH_PROFILE" ]; then
@@ -18,7 +21,6 @@ if [ -f "$UBOOT_FETCH_PROFILE" ]; then
 fi
 
 UBOOT_ASSETS_DIR="${UBOOT_ASSETS_DIR:-${BOARD_UBOOT_ASSETS_DIR:-$REPO_ROOT/assets/reference/u-boot}}"
-DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 UBOOT_FETCH_MODE="${UBOOT_FETCH_MODE:-spi-image}"
 SPI_BASE_IMAGE_FILENAME="${SPI_BASE_IMAGE_FILENAME:-${BOARD_SPI_BASE_IMAGE_FILENAME_DEFAULT:-radxa-$BOARD-spi-base.img}}"
 SPI_BASE_IMAGE_URL="${SPI_BASE_IMAGE_URL:-${BOARD_SPI_BASE_IMAGE_URL_DEFAULT:-}}"
@@ -166,12 +168,7 @@ download_source_if_needed() {
       echo "$label URL is not set for BOARD=$BOARD and no local source path exists." >&2
       return 1
     fi
-    echo "Downloading board bootloader source:"
-    echo "  KIND: $label"
-    echo "  URL:  $url"
-    echo "  PATH: $path"
-    if ! curl -fL --retry 3 --retry-delay 2 "$url" -o "$path"; then
-      echo "Failed to download bootloader source: $url" >&2
+    if ! download_cached_url "$url" "$path" "$label" "$FORCE_DOWNLOAD"; then
       SOURCE_AVAILABLE=0
       return 1
     fi

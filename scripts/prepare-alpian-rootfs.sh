@@ -9,14 +9,16 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # shellcheck disable=SC1091
 source "$SCRIPT_DIR/lib/board-config.sh"
+# shellcheck disable=SC1091
+source "$SCRIPT_DIR/lib/cache.sh"
 load_board_config
+cache_init
 
 ALPINE_BRANCH="${ALPINE_BRANCH:-v3.23}"
 ALPINE_VERSION="${ALPINE_VERSION:-3.23.3}"
 ALPINE_ARCH="${ALPINE_ARCH:-aarch64}"
 ALPINE_MIRROR="${ALPINE_MIRROR:-https://dl-cdn.alpinelinux.org/alpine}"
 HOST_ARCH="${HOST_ARCH:-$(uname -m)}"
-APK_CACHE_DIR="${APK_CACHE_DIR:-$REPO_ROOT/build/apk-cache}"
 ALPINE_PACKAGES="${ALPINE_PACKAGES:-}"
 ALPINE_PACKAGE_LIST_FILE="${ALPINE_PACKAGE_LIST_FILE:-}"
 ALPINE_PACKAGE_LIST_FILES="${ALPINE_PACKAGE_LIST_FILES:-}"
@@ -56,7 +58,6 @@ BOOT_NTP_SERVICE_NAME="${BOOT_NTP_SERVICE_NAME:-${BOARD_BOOT_NTP_SERVICE_NAME:-$
 MOTD_TEMPLATE_FILE="${MOTD_TEMPLATE_FILE:-$REPO_ROOT/assets/reference/alpine/motd-main}"
 ENFORCE_IMMUTABLE_ROOT="${ENFORCE_IMMUTABLE_ROOT:-1}"
 
-DOWNLOAD_DIR="${DOWNLOAD_DIR:-$REPO_ROOT/build/downloads}"
 ROOTFS_DIR_WAS_SET="${ROOTFS_DIR+x}"
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
 ROOTFS_TAR="${ROOTFS_TAR:-$REPO_ROOT/build/alpine-rootfs.tar}"
@@ -110,8 +111,7 @@ MINIROOTFS_URL="${ALPINE_MIRROR}/${ALPINE_BRANCH}/releases/${ALPINE_ARCH}/${MINI
 MINIROOTFS_PATH="${DOWNLOAD_DIR}/${MINIROOTFS}"
 
 if [ ! -f "$MINIROOTFS_PATH" ]; then
-  echo "Downloading $MINIROOTFS_URL"
-  curl -fL "$MINIROOTFS_URL" -o "$MINIROOTFS_PATH"
+  download_cached_url "$MINIROOTFS_URL" "$MINIROOTFS_PATH" "Alpine minirootfs"
 fi
 
 extract_minirootfs() {
@@ -179,7 +179,10 @@ mkdir -p "$ROOTFS_DIR/opt" "$ROOTFS_DIR/var/lib/docker"
 # Install additional Alpine packages from the host using apk.static.
 HOST_APKINDEX="${DOWNLOAD_DIR}/APKINDEX-${ALPINE_BRANCH}-${HOST_ARCH}.tar.gz"
 if [ ! -f "$HOST_APKINDEX" ]; then
-  curl -fL "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main/${HOST_ARCH}/APKINDEX.tar.gz" -o "$HOST_APKINDEX"
+  download_cached_url \
+    "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main/${HOST_ARCH}/APKINDEX.tar.gz" \
+    "$HOST_APKINDEX" \
+    "Alpine host APKINDEX"
 fi
 tar -xzf "$HOST_APKINDEX" -C "$tmp_work"
 APK_TOOLS_STATIC_VERSION="$(awk 'BEGIN{RS="\n\n"} /P:apk-tools-static\n/ {for (i=1; i<=NF; i++) if ($i ~ /^V:/) {print substr($i,3); exit}}' "$tmp_work/APKINDEX")"
@@ -191,7 +194,10 @@ fi
 APK_TOOLS_STATIC_PKG="apk-tools-static-${APK_TOOLS_STATIC_VERSION}.apk"
 APK_TOOLS_STATIC_PATH="${DOWNLOAD_DIR}/${APK_TOOLS_STATIC_PKG}"
 if [ ! -f "$APK_TOOLS_STATIC_PATH" ]; then
-  curl -fL "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main/${HOST_ARCH}/${APK_TOOLS_STATIC_PKG}" -o "$APK_TOOLS_STATIC_PATH"
+  download_cached_url \
+    "${ALPINE_MIRROR}/${ALPINE_BRANCH}/main/${HOST_ARCH}/${APK_TOOLS_STATIC_PKG}" \
+    "$APK_TOOLS_STATIC_PATH" \
+    "apk-tools-static"
 fi
 tar -xzf "$APK_TOOLS_STATIC_PATH" -C "$tmp_work"
 APK_STATIC="$tmp_work/sbin/apk.static"

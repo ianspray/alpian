@@ -82,6 +82,7 @@ scripts/build-apk-repo.sh
 Container notes:
 
 - `scripts/build-alpian-in-container.sh` builds `Dockerfile.builder` (Debian Bookworm) and runs your build inside it.
+- Preferred partial-build usage is `scripts/build-alpian-in-container.sh -- make <target>` so the `Makefile` can preserve dependency tracking and stamp/hash reuse.
 - The container is run with `--privileged` so the existing Linux-native tooling (`guestfish`, loop/partition tooling, nested `podman` for APK build) can execute.
 - Artifacts are written to the host via bind mount under `build/`.
 - Flashing to USB/NVMe is intentionally not done by the container; use your host-side tooling for that step.

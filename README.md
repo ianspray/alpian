@@ -32,6 +32,7 @@ For full build/run details, see [src/README.md](./src/README.md), and for simpli
   - Test helpers/placeholders.
 - `build/`
   - Generated artifacts and temporary build state.
+  - Shared fetch cache now lives under `build/cache/` and is reused by the rootfs, kernel, U-Boot, and APK build scripts.
 - `work/`
   - Scratch area (legacy/manual workflows), not required by the default scripted pipeline.
 - `.git/`
@@ -44,6 +45,7 @@ These can be removed and will be recreated by scripts when needed.
 - `build/`
   - Recreated by all build scripts (`scripts/build-*.sh`, `scripts/prepare-alpian-rootfs.sh`, `scripts/assemble-image.sh`).
   - Contains outputs like kernel artifacts, rootfs tarball, image files, APK repo, U-Boot build trees.
+  - Also contains the persistent shared asset cache in `build/cache/`.
 - `src/radxa-kernel-<board>/`
   - Recreated by `scripts/fetch-radxa-kernel.sh` (called by `scripts/build-kernel.sh`) for Radxa-source boards.
   - This is a local git clone of the Radxa kernel branch.
@@ -105,7 +107,8 @@ scripts/build-usb-updater-image.sh
 ## Notes
 
 - `.gitignore` already marks generated trees (`build/`, `work/`, `src/radxa-kernel/`, `src/radxa-kernel-*`) as non-tracked.
-- If disk space cleanup is needed, deleting `build/` is the highest-impact safe reset.
+- External downloads and git mirrors are cached under `build/cache/` by default. Override with `CACHE_ROOT=/path/to/cache` if you want to share one cache across multiple working copies.
+- If disk space cleanup is needed, deleting `build/` is the highest-impact safe reset, but it will also remove the local fetch cache.
 
 # Copyright and Licence
 

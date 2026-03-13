@@ -1,0 +1,10 @@
+FROM alpine:3.23
+
+RUN apk add --no-cache alpine-sdk bash && \
+    adduser -D builder && \
+    addgroup builder abuild && \
+    install -d -m 700 -o builder -g builder /home/builder/.abuild
+
+WORKDIR /work
+
+CMD ["sh"]
