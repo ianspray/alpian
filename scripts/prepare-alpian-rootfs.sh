@@ -378,6 +378,9 @@ fi
 echo "$ALPIAN_DEFAULT_HOSTNAME" >"$ROOTFS_DIR/etc/hostname"
 
 mkdir -p "$ROOTFS_DIR/etc/avahi/services"
+if [ -f "$ROOTFS_DIR/etc/avahi/avahi-daemon.conf" ]; then
+  sed -i 's/.*enable-dbus=.*/enable-dbus=no/' "$ROOTFS_DIR/etc/avahi/avahi-daemon.conf"
+fi
 cat >"$ROOTFS_DIR/etc/avahi/services/ssh.service" <<'EOF'
 <?xml version="1.0" standalone='no'?>
 <!DOCTYPE service-group SYSTEM "avahi-service.dtd">
