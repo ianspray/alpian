@@ -528,23 +528,42 @@ if [ -n "\$apkovl_spec" ]; then
       apkovl_path="\${partlabel#*:}"
       partname="\${partlabel%%:*}"
       log "Looking for partition: partname=\$partname path=\$apkovl_path"
-      log "Waiting for NVMe devices..."
+      log "Waiting for block devices..."
       waited=0
-      while [ "\$waited" -lt 60 ]; do
-        for nvme_dev in /dev/nvme*; do
-          [ -e "\$nvme_dev" ] || continue
-          log "Found NVMe device: \$nvme_dev"
-          for part in "\$nvme_dev"*; do
-            [ -e "\$part" ] || continue
-            [ "\$part" = "\$nvme_dev" ] && continue
-            label="\$(\$BB blkid -o value -s LABEL "\$part" 2>/dev/null || true)"
-            if [ "\$label" = "\$partname" ]; then
-              apkovl_dev="\$part"
-              log "Found \$partname at \$apkovl_dev"
-              break 2
+      while [ -z "\$apkovl_dev" ] && [ "\$waited" -lt 60 ]; do
+        if [ -d /dev/disk/by-label ]; then
+          for link in /dev/disk/by-label/*; do
+            [ -e "\$link" ] || continue
+            target="\$(\$BB readlink -f "\$link" 2>/dev/null || true)"
+            label="\$(\$BB basename "\$link")"
+            if [ "\$label" = "\$partname" ] && [ -n "\$target" ]; then
+              apkovl_dev="\$target"
+              log "Found \$partname at \$apkovl_dev via /dev/disk/by-label"
+              break
             fi
           done
-        done
+        fi
+        if [ -z "\$apkovl_dev" ]; then
+          for nvme_dev in /dev/nvme*; do
+            [ -e "\$nvme_dev" ] || continue
+            for part in "\$nvme_dev"*; do
+              [ -e "\$part" ] || continue
+              [ "\$part" = "\$nvme_dev" ] && continue
+              if \$BB grep -q "\$part" /proc/mounts 2>/dev/null; then
+                continue
+              fi
+              if \$BB mount -o ro "\$part" /mnt 2>/dev/null; then
+                check_label="\$(\$BB cat /mnt/.disk/info 2>/dev/null || \$BB blkid -s LABEL -o value "\$part" 2>/dev/null || true)"
+                \$BB umount /mnt 2>/dev/null
+                if [ "\$check_label" = "\$partname" ]; then
+                  apkovl_dev="\$part"
+                  log "Found \$partname at \$apkovl_dev"
+                  break 2
+                fi
+              fi
+            done
+          done
+        fi
         \$BB sleep 2
         waited=\$((waited + 2))
       done
