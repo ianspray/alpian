@@ -2,3 +2,4 @@
 # One package per line. Comment lines are ignored.
 #
 partition-mount-service
+alpian-hostname-service

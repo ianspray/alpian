@@ -57,6 +57,7 @@ NET_BANNER_SERVICE_NAME="${NET_BANNER_SERVICE_NAME:-${BOARD_NET_BANNER_SERVICE_N
 BOOT_NTP_SERVICE_NAME="${BOOT_NTP_SERVICE_NAME:-${BOARD_BOOT_NTP_SERVICE_NAME:-${BOARD}-ntp-sync}}"
 MOTD_TEMPLATE_FILE="${MOTD_TEMPLATE_FILE:-$REPO_ROOT/assets/reference/alpine/motd-main}"
 ENFORCE_IMMUTABLE_ROOT="${ENFORCE_IMMUTABLE_ROOT:-1}"
+ALPIAN_DEFAULT_HOSTNAME="${ALPIAN_DEFAULT_HOSTNAME:-alpian-${BOARD}}"
 
 ROOTFS_DIR_WAS_SET="${ROOTFS_DIR+x}"
 ROOTFS_DIR="${ROOTFS_DIR:-$REPO_ROOT/build/alpine-rootfs}"
@@ -364,6 +365,58 @@ if [ -f "$ROOTFS_DIR/etc/lbu/lbu.conf" ]; then
   else
     echo "LBU_MEDIA=config" >>"$ROOTFS_DIR/etc/lbu/lbu.conf"
   fi
+  if grep -Eq '^[# ]*LBU_BACKUPDIR=' "$ROOTFS_DIR/etc/lbu/lbu.conf"; then
+    sed -E -i 's|^[# ]*LBU_BACKUPDIR=.*|LBU_BACKUPDIR=/media/config|' "$ROOTFS_DIR/etc/lbu/lbu.conf"
+  else
+    echo "LBU_BACKUPDIR=/media/config" >>"$ROOTFS_DIR/etc/lbu/lbu.conf"
+  fi
+  if ! grep -Eq '^[# ]*ALPIAN_APKOVL=' "$ROOTFS_DIR/etc/lbu/lbu.conf"; then
+    echo "ALPIAN_APKOVL=/media/config/alpian.apkovl.tar.gz" >>"$ROOTFS_DIR/etc/lbu/lbu.conf"
+  fi
+fi
+
+echo "$ALPIAN_DEFAULT_HOSTNAME" >"$ROOTFS_DIR/etc/hostname"
+
+mkdir -p "$ROOTFS_DIR/etc/avahi/services"
+cat >"$ROOTFS_DIR/etc/avahi/services/ssh.service" <<'EOF'
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">%h SSH</name>
+  <service>
+    <type>_ssh._tcp</type>
+    <port>22</port>
+  </service>
+</service-group>
+EOF
+
+cat >"$ROOTFS_DIR/etc/avahi/services/device-info.service" <<'EOF'
+<?xml version="1.0" standalone='no'?>
+<!DOCTYPE service-group SYSTEM "avahi-service.dtd">
+<service-group>
+  <name replace-wildcards="yes">%h Device Info</name>
+  <service>
+    <type>_device-info._tcp</type>
+    <port>0</port>
+    <txt-record>model=Alpian Linux on AArch64</txt-record>
+  </service>
+</service-group>
+EOF
+
+if [ -f "$ROOTFS_DIR/etc/nsswitch.conf" ]; then
+  if ! grep -Eq '^hosts:.*mdns4_minimal' "$ROOTFS_DIR/etc/nsswitch.conf"; then
+    sed -i 's/^hosts:[[:space:]]*/hosts:          files mdns4_minimal dns /' "$ROOTFS_DIR/etc/nsswitch.conf"
+  fi
+fi
+
+mkdir -p "$ROOTFS_DIR/media/config"
+ALPIAN_APKOVL_PATH="$ROOTFS_DIR/media/config/alpian.apkovl.tar.gz"
+if [ ! -f "$ALPIAN_APKOVL_PATH" ]; then
+  tmp_apkovl_dir="$(mktemp -d)"
+  mkdir -p "$tmp_apkovl_dir/etc"
+  cp "$ROOTFS_DIR/etc/hostname" "$tmp_apkovl_dir/etc/"
+  tar -C "$tmp_apkovl_dir" -czf "$ALPIAN_APKOVL_PATH" etc/
+  rm -rf "$tmp_apkovl_dir"
 fi
 
 mkdir -p "$ROOTFS_DIR/etc/network"
@@ -421,7 +474,7 @@ done
 for svc in modules sysctl hostname bootmisc swclock localmount; do
   enable_service "$svc" boot
 done
-for svc in networking sshd; do
+for svc in networking sshd avahi-daemon; do
   enable_service "$svc" default
 done
 for svc in $BOARD_BOOT_SERVICES; do

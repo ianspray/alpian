@@ -1,0 +1,23 @@
+# SPDX-License-Identifier: MIT
+# Maintainer: IWS <iws@toothless.local>
+pkgname=alpian-hostname-service
+pkgver=0.1.0
+pkgrel=0
+pkgdesc="Alpian hostname management with lbu persistence and avahi integration"
+url="https://example.invalid/alpian"
+arch="noarch"
+license="MIT"
+depends="avahi-daemon openrc"
+source="
+	hostname-set
+"
+builddir="$srcdir"
+options="!check"
+
+package() {
+	install -Dm755 "$srcdir"/hostname-set "$pkgdir"/usr/sbin/hostname-set
+}
+
+sha512sums="
+09cd664ab192aceab177286fab4e4c0dadf9a62f8177dd2c3510cffe3e1341c597b9b0f8a7c1f641d271d678b47f055034163aaa8b501714f44097070fedfa5b  hostname-set
+"
