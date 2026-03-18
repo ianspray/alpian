@@ -528,22 +528,24 @@ if [ -n "\$apkovl_spec" ]; then
       apkovl_path="\${partlabel#*:}"
       partname="\${partlabel%%:*}"
       log "Looking for partition: partname=\$partname path=\$apkovl_path"
+      log "Available block devices:"
+      for dev in /dev/nvme* /dev/mmcblk* /dev/sd* /dev/vd*; do
+        [ -e "\$dev" ] && log "  \$dev exists"
+      done
       waited=0
       while [ -z "\$apkovl_dev" ] && [ "\$waited" -lt 30 ]; do
-        for uevent in /sys/class/block/*/uevent; do
-          [ -f "\$uevent" ] || continue
+        for block_path in /sys/class/block/*; do
+          dev_name="\${block_path#/sys/class/block/}"
+          [ -f "\$block_path/uevent" ] || continue
           partname_check=""
           while IFS= read -r line; do
             case "\$line" in
               PARTNAME=*) partname_check="\${line#PARTNAME=}" ;;
             esac
-          done <"\$uevent"
-          log "Checking \$uevent: PARTNAME=\$partname_check"
+          done <"\$block_path/uevent"
           if [ "\$partname_check" = "\$partname" ]; then
-            devnode="/dev/\${uevent#/sys/class/block/}"
-            devnode="\${devnode%/uevent}"
-            apkovl_dev="\$devnode"
-            log "Found device: \$apkovl_dev"
+            apkovl_dev="/dev/\$dev_name"
+            log "Found \$partname at \$apkovl_dev"
             break
           fi
         done
@@ -558,9 +560,9 @@ if [ -n "\$apkovl_spec" ]; then
       ;;
   esac
 
-  if [ -n "\$apkovl_dev" ] && [ -b "\$apkovl_dev" ]; then
+  if [ -n "\$apkovl_dev" ] && [ -e "\$apkovl_dev" ]; then
     \$BB mkdir -p /media/apkovl_src
-    log "Mounting config partition..."
+    log "Mounting config partition at \$apkovl_dev..."
     if \$BB mount -o ro "\$apkovl_dev" /media/apkovl_src 2>/dev/null; then
       log "Config partition mounted, checking for \$apkovl_path"
       if [ -f "/media/apkovl_src/\$apkovl_path" ]; then
