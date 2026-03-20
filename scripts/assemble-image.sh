@@ -834,7 +834,8 @@ tar-in $ROOTFS_PAYLOAD_TAR /
 tar-in $MODULES_TAR /
 tar-in $RPI_BOOT_TAR /config
 mkdir-p /config/cache
-${opt_mount_cmd}${docker_mount_cmd}EOF
+${opt_mount_cmd}${docker_mount_cmd}
+EOF
     ;;
 esac
 
