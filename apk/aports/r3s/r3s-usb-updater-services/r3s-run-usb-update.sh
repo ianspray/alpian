@@ -195,6 +195,36 @@ derive_bootcfg_device_from_root() {
   return 1
 }
 
+preserve_target_apkovl() {
+    local config_dev="" config_mnt="/run/r3s-apkovl-preserve"
+    config_dev="$(derive_partition_device_from_root "$TARGET_DEVICE" 1)" || return 0
+    [ -b "$config_dev" ] || return 0
+    mkdir -p "$config_mnt"
+    if mount -o ro "$config_dev" "$config_mnt" 2>/dev/null; then
+        if [ -f "$config_mnt/alpian.apkovl.tar.gz" ]; then
+            cp "$config_mnt/alpian.apkovl.tar.gz" /tmp/preserved.apkovl.tar.gz
+            log "Preserved apkovl from target config partition"
+        fi
+        umount "$config_mnt"
+    fi
+    rmdir "$config_mnt" 2>/dev/null || true
+}
+
+restore_target_apkovl() {
+    local config_dev="" config_mnt="/run/r3s-apkovl-preserve"
+    [ -f /tmp/preserved.apkovl.tar.gz ] || return 0
+    config_dev="$(derive_partition_device_from_root "$TARGET_DEVICE" 1)" || return 0
+    [ -b "$config_dev" ] || return 0
+    mkdir -p "$config_mnt"
+    if mount -o rw "$config_dev" "$config_mnt" 2>/dev/null; then
+        cp /tmp/preserved.apkovl.tar.gz "$config_mnt/alpian.apkovl.tar.gz"
+        log "Restored apkovl to target config partition"
+        rm /tmp/preserved.apkovl.tar.gz
+        umount "$config_mnt"
+    fi
+    rmdir "$config_mnt" 2>/dev/null || true
+}
+
 root_dev="$(resolve_root_device)"
 if [ -z "$root_dev" ] || [ ! -b "$root_dev" ]; then
   log "Unable to determine root block device."
@@ -307,6 +337,7 @@ if [ -f "$DONE_MARKER" ]; then
 fi
 
 log "Verifying payload checksum..."
+preserve_target_apkovl
 (cd "$(dirname "$PAYLOAD_FILE")" && sha256sum -c "$(basename "$PAYLOAD_SHA256")")
 
 log "Flashing payload to $TARGET_DEVICE (this can take several minutes)..."
@@ -331,6 +362,7 @@ done
 wait "$flash_pid"
 sync
 touch "$BOOT_DONE_MARKER"
+restore_target_apkovl
 
 if command -v partprobe >/dev/null 2>&1; then
   partprobe "$TARGET_DEVICE" || true
