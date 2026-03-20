@@ -310,6 +310,12 @@ disable_root_extlinux() {
     return 0
   fi
 
+  touch "$ROOTFS_RW_MOUNT/.test-write" 2>/dev/null && rm -f "$ROOTFS_RW_MOUNT/.test-write" || {
+    umount "$ROOTFS_RW_MOUNT" 2>/dev/null || true
+    log "Warning: updater rootfs is read-only; skipping extlinux disable"
+    return 0
+  }
+
   for f in "$ROOT_EXTLINUX_PRIMARY" "$ROOT_EXTLINUX_ALT"; do
     rel="${f#/}"
     src="$ROOTFS_RW_MOUNT/$rel"
