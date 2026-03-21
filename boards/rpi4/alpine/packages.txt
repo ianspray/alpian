@@ -2,4 +2,3 @@
 # These entries are appended after boards/alpian/alpine/packages.txt.
 
 rpi4-openrc-services
-rpi4-usb-updater-services

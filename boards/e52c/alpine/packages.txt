@@ -2,4 +2,3 @@
 # These entries are appended after boards/alpian/alpine/packages.txt.
 
 e52c-openrc-services
-e52c-usb-updater-services

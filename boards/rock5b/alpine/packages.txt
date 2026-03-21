@@ -2,4 +2,3 @@
 # These entries are appended after boards/alpian/alpine/packages.txt.
 
 rock5b-openrc-services
-rock5b-usb-updater-services

@@ -2,4 +2,3 @@
 # These entries are appended after boards/alpian/alpine/custom-packages.txt.
 #
 rock3b-openrc-services
-rock3b-usb-updater-services

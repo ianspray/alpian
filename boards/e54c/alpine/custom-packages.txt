@@ -3,4 +3,3 @@
 #
 e54c-openrc-sample
 e54c-openrc-services
-e54c-usb-updater-services

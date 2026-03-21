@@ -2,4 +2,3 @@
 # These entries are appended after boards/alpian/alpine/packages.txt.
 
 e25-openrc-services
-e25-usb-updater-services
