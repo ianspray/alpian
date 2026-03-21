@@ -133,7 +133,6 @@ derive_partition_device_from_root() {
 partition_has_updater_bootcfg() {
   local dev="$1" mountpoint="" probe_mnt="" has_state=1
   [ -b "$dev" ] || return 1
-  log "DEBUG: partition_has_updater_bootcfg checking $dev"
 
   mountpoint="$(awk -v d="$dev" '$1==d{print $2; exit}' /proc/mounts 2>/dev/null || true)"
   if [ -n "$mountpoint" ]; then
@@ -217,34 +216,25 @@ if [ -z "$root_dev" ] || [ ! -b "$root_dev" ]; then
   log "Unable to determine root block device."
   exit 1
 fi
-log "DEBUG: root_dev=$root_dev"
-log "DEBUG: lsblk $(lsblk -npo NAME,PARTLABEL,FSTYPE "$root_dev" 2>/dev/null || true)"
-log "DEBUG: lsblk base $(lsblk -npo NAME,PARTLABEL,FSTYPE "${root_dev%p[0-9]*}" 2>/dev/null || true)"
 
 base_dev="${root_dev%p[0-9]*}"
-log "DEBUG: base_dev=$base_dev"
 if [ -n "$base_dev" ] && [ -b "$base_dev" ]; then
   if command -v blockdev >/dev/null 2>&1; then
-    log "DEBUG: running blockdev --rereadpt $base_dev"
-    blockdev --rereadpt "$base_dev" 2>/dev/null && log "DEBUG: blockdev succeeded" || log "DEBUG: blockdev failed"
+    blockdev --rereadpt "$base_dev" 2>/dev/null || true
   fi
-  log "DEBUG: lsblk after reread $(lsblk -npo NAME,PARTLABEL "$base_dev" 2>/dev/null || true)"
 fi
 
 efi_dev="$(derive_bootcfg_device_from_root "$root_dev" || true)"
-log "DEBUG: derive_bootcfg returned efi_dev='$efi_dev'"
 
 if [ -z "$efi_dev" ]; then
   log "Updater bootcfg partition could not be determined; using p2 of root device."
   efi_dev="${base_dev}p2"
 fi
-log "DEBUG: final efi_dev=$efi_dev"
 
 if [ ! -b "$efi_dev" ]; then
   log "Updater bootcfg partition not found: $efi_dev"
   exit 1
 fi
-log "DEBUG: lsblk for efi_dev $(lsblk -npo NAME,PARTLABEL,FSTYPE "$efi_dev" 2>/dev/null || true)"
 
 if [ "$root_dev" = "${TARGET_DEVICE}p3" ] || [ "$root_dev" = "${TARGET_DEVICE}p2" ] || [ "$root_dev" = "${TARGET_DEVICE}p1" ]; then
   log "Rootfs is on target device $TARGET_DEVICE; refusing to self-overwrite."
@@ -272,16 +262,13 @@ log "Target device: $TARGET_DEVICE"
 
 disable_root_extlinux() {
   local work_mnt="/run/e52c-boot-rw"
-  log "DEBUG: disable_root_extlinux called, efi_dev=$efi_dev"
 
   mkdir -p "$work_mnt"
-  log "DEBUG: attempting mount -o rw $efi_dev $work_mnt"
   if ! mount -o rw "$efi_dev" "$work_mnt" 2>/dev/null; then
     log "Warning: cannot mount updater boot partition as writable; skipping extlinux disable"
     rmdir "$work_mnt" 2>/dev/null || true
     return 0
   fi
-  log "DEBUG: mount succeeded, checking for extlinux.conf"
 
   if [ -f "$work_mnt/extlinux/extlinux.conf" ]; then
     if mv "$work_mnt/extlinux/extlinux.conf" "$work_mnt/extlinux/extlinux.conf.disabled"; then
