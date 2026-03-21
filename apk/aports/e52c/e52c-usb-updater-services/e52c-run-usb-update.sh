@@ -17,21 +17,33 @@ log() {
   [ "$DEBUG" = "1" ] && echo "[e52c-usb-updater] $*" >&2
 }
 
+echo "[DEBUG] e52c-run-usb-update starting" >/dev/console 2>/dev/null || true
+echo "[DEBUG] cmdline: $(cat /proc/cmdline)" >/dev/console 2>/dev/null || true
+echo "[DEBUG] ROOT_PARTLABEL_REQUIRED: $ROOT_PARTLABEL_REQUIRED" >/dev/console 2>/dev/null || true
+echo "[DEBUG] LOCK_DIR: $LOCK_DIR" >/dev/console 2>/dev/null || true
+
 log "E52C updater image active."
 
+echo "[DEBUG] before mkdir" >/dev/console 2>/dev/null || true
 if ! mkdir "$LOCK_DIR" 2>/dev/null; then
   log "Updater is already running; skipping."
   exit 0
 fi
+echo "[DEBUG] after mkdir, lock acquired" >/dev/console 2>/dev/null || true
 cleanup() {
   rmdir "$LOCK_DIR" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
+echo "[DEBUG] after trap" >/dev/console 2>/dev/null || true
 
+echo "[DEBUG] before grep" >/dev/console 2>/dev/null || true
+echo "[DEBUG] pattern: root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" >/dev/console 2>/dev/null || true
 if grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null; then
+  echo "[DEBUG] grep found match" >/dev/console 2>/dev/null || true
   log "Not running from updater rootfs (root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED not in cmdline); skipping updater."
   exit 0
 fi
+echo "[DEBUG] after grep" >/dev/console 2>/dev/null || true
 
 resolve_root_device() {
   local src="" devname=""
