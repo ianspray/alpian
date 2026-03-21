@@ -9,7 +9,6 @@ ROOT_PARTLABEL_REQUIRED="${ROOT_PARTLABEL_REQUIRED:-updater-rootfs}"
 TARGET_WAIT_SECONDS="${TARGET_WAIT_SECONDS:-120}"
 
 LOCK_DIR="/run/e54c-usb-update.lock"
-BOOT_DONE_MARKER="/run/e54c-usb-update.done"
 
 log() {
   echo "[e54c-usb-updater] $*"
@@ -26,14 +25,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-if [ -f "$BOOT_DONE_MARKER" ]; then
-  log "Updater already flashed image in this boot; skipping."
-  exit 0
-fi
-
 if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null; then
-  log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED)."
-  exit 1
+  log "Not running from updater rootfs (root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED not in cmdline); skipping updater."
+  exit 0
 fi
 
 resolve_root_device() {
@@ -326,7 +320,6 @@ while kill -0 "$flash_pid" 2>/dev/null; do
 done
 wait "$flash_pid"
 sync
-touch "$BOOT_DONE_MARKER"
 restore_target_apkovl
 
 if command -v partprobe >/dev/null 2>&1; then

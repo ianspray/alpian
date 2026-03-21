@@ -11,7 +11,6 @@ SERIAL_TTY="${SERIAL_TTY:-ttyFIQ0}"
 SERIAL_DEV="/dev/$SERIAL_TTY"
 
 LOCK_DIR="/run/r3s-usb-update.lock"
-BOOT_DONE_MARKER="/run/r3s-usb-update.done"
 
 emit_serial() {
   [ -c "$SERIAL_DEV" ] || [ -e "$SERIAL_DEV" ] || return 0
@@ -37,14 +36,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-if [ -f "$BOOT_DONE_MARKER" ]; then
-  log "Updater already flashed image in this boot; skipping."
-  exit 0
-fi
-
 if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null; then
-  log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED)."
-  exit 1
+  log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED); skipping updater."
+  exit 0
 fi
 
 resolve_root_device() {
@@ -337,7 +331,6 @@ while kill -0 "$flash_pid" 2>/dev/null; do
 done
 wait "$flash_pid"
 sync
-touch "$BOOT_DONE_MARKER"
 restore_target_apkovl
 
 if command -v partprobe >/dev/null 2>&1; then

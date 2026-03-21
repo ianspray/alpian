@@ -2,3 +2,5 @@
 target_device="/dev/mmcblk0"
 root_partlabel="e52c-updater-rootfs"
 target_wait_seconds="120"
+# Set to 1 for verbose debug output on serial console
+debug="0"

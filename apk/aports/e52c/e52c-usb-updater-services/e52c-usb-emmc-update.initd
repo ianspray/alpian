@@ -14,6 +14,7 @@ start() {
   TARGET_DEVICE="${target_device:-/dev/mmcblk0}" \
     ROOT_PARTLABEL_REQUIRED="${root_partlabel:-e52c-updater-rootfs}" \
     TARGET_WAIT_SECONDS="${target_wait_seconds:-120}" \
+    DEBUG="${debug:-0}" \
     /usr/sbin/e52c-run-usb-update
   eend $?
 }

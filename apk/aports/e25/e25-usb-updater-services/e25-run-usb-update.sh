@@ -9,7 +9,6 @@ ROOT_PARTLABEL_REQUIRED="${ROOT_PARTLABEL_REQUIRED:-e25-updater-rootfs}"
 TARGET_WAIT_SECONDS="${TARGET_WAIT_SECONDS:-120}"
 
 LOCK_DIR="/run/e25-usb-update.lock"
-BOOT_DONE_MARKER="/run/e25-usb-update.done"
 
 log() {
   echo "<6>[e25-usb-updater] $*" >/dev/kmsg 2>/dev/null || true
@@ -28,14 +27,9 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-if [ -f "$BOOT_DONE_MARKER" ]; then
-  log "Updater already flashed image in this boot; skipping."
-  exit 0
-fi
-
 if ! grep -q "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null; then
-  log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED)."
-  exit 1
+  log "Not running from updater rootfs (expected root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED); skipping updater."
+  exit 0
 fi
 
 resolve_root_device() {
@@ -328,7 +322,6 @@ while kill -0 "$flash_pid" 2>/dev/null; do
 done
 wait "$flash_pid"
 sync
-touch "$BOOT_DONE_MARKER"
 restore_target_apkovl
 
 if command -v partprobe >/dev/null 2>&1; then
