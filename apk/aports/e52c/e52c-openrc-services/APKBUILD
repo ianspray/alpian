@@ -1,13 +1,13 @@
 # SPDX-License-Identifier: MIT
 # Maintainer: IWS <iws@toothless.local>
 pkgname=e52c-openrc-services
-pkgver=0.1.0
+pkgver=0.2.0
 pkgrel=0
 pkgdesc="E52C OpenRC helper services for diskless and serial operation"
 url="https://example.invalid/e52c-alpian"
 arch="noarch"
 license="MIT"
-depends="openrc busybox"
+depends="openrc busybox iproute2"
 source="
   e52c-apply-dev-perms.sh
   e52c-dev-perms.initd
@@ -21,6 +21,8 @@ source="
   e52c-bootmode-oneshot-apply.sh
   e52c-bootmode-oneshot.initd
   e52c-root-mode.initd
+  70-persistent-net.rules
+  e52c-udhcpc.sh
 "
 builddir="$srcdir"
 options="!check"
@@ -42,6 +44,9 @@ package() {
 
   install -Dm755 "$srcdir"/e52c-bootmode-oneshot.initd "$pkgdir"/etc/init.d/e52c-bootmode-oneshot
   install -Dm755 "$srcdir"/e52c-root-mode.initd "$pkgdir"/etc/init.d/e52c-root-mode
+
+  install -Dm644 "$srcdir"/70-persistent-net.rules "$pkgdir"/etc/udev/rules.d/70-persistent-net.rules
+  install -Dm755 "$srcdir"/e52c-udhcpc.sh "$pkgdir"/usr/share/udhcpc/default.script
 }
 
 sha512sums=""
