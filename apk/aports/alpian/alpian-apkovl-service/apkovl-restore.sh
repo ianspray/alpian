@@ -27,6 +27,14 @@ find_config_part() {
 	done
 
 	if [ ! -f "$APKOVL_PATH" ]; then
+		if [ -d /media/config ]; then
+			hostname_apkovl="$(ls /media/config/*.apkovl.tar.gz 2>/dev/null | head -n1 || true)"
+			if [ -n "$hostname_apkovl" ] && [ -f "$hostname_apkovl" ]; then
+				log "Using hostname-based apkovl: $hostname_apkovl"
+				APKOVL_PATH="$hostname_apkovl"
+				return 0
+			fi
+		fi
 		log "Config partition not found, skipping apkovl restore"
 		return 0
 	fi

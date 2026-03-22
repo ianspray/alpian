@@ -551,9 +551,20 @@ if [ -n "\$apkovl_spec" ]; then
     log "Mounting config partition at \$apkovl_dev..."
     if \$BB mount -o ro "\$apkovl_dev" /media/apkovl_src 2>/dev/null; then
       log "Config partition mounted, checking for \$apkovl_path"
+      apkovl_found=""
       if [ -f "/media/apkovl_src/\$apkovl_path" ]; then
-        log "Found apkovl, extracting to /newroot"
-        \$BB tar -xzf "/media/apkovl_src/\$apkovl_path" -C /newroot 2>/dev/null || log "Failed to extract apkovl"
+        log "Found apkovl (fixed name): /media/apkovl_src/\$apkovl_path"
+        apkovl_found="/media/apkovl_src/\$apkovl_path"
+      else
+        fallback_apkovl="\$(\$BB ls /media/apkovl_src/*.apkovl.tar.gz 2>/dev/null | \$BB head -n1 || true)"
+        if [ -n "\$fallback_apkovl" ] && [ -f "\$fallback_apkovl" ]; then
+          log "Found apkovl (hostname fallback): \$fallback_apkovl"
+          apkovl_found="\$fallback_apkovl"
+        fi
+      fi
+      if [ -n "\$apkovl_found" ]; then
+        log "Extracting apkovl to /newroot"
+        \$BB tar -xzf "\$apkovl_found" -C /newroot 2>/dev/null || log "Failed to extract apkovl"
       else
         log "Apkovl not found: /media/apkovl_src/\$apkovl_path"
       fi
