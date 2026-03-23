@@ -8,6 +8,7 @@ url="https://example.invalid/e52c-alpian"
 arch="noarch"
 license="MIT"
 depends="openrc busybox iproute2"
+replaces="busybox"
 source="
   e52c-apply-dev-perms.sh
   e52c-dev-perms.initd
