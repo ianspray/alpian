@@ -33,7 +33,7 @@ ensure_mounts() {
 
 set_default_label() {
   label="$1"
-  tmp="$(mktemp)"
+  tmp="$(mktemp -p /var/tmp)"
   awk -v lbl="$label" '
     BEGIN { done=0 }
     /^[[:space:]]*DEFAULT[[:space:]]+/ && done==0 {

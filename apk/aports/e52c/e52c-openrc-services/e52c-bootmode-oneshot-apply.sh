@@ -27,7 +27,7 @@ if ! mount -o remount,rw "$EFI_MOUNT"; then
   exit 0
 fi
 
-tmp="$(mktemp)"
+tmp="$(mktemp -p /var/tmp)"
 awk '
   BEGIN { done=0 }
   /^[[:space:]]*DEFAULT[[:space:]]+/ && done==0 {
