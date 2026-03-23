@@ -31,6 +31,18 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
+log "Probing MMC devices..."
+for ctrl in /sys/class/mmc_host/*; do
+  [ -d "$ctrl" ] || continue
+  ctrl_name="$(basename "$ctrl")"
+  log "  MMC host: $ctrl_name"
+  for dev in "$ctrl"/mmc*:*; do
+    [ -d "$dev" ] || continue
+    dev_name="$(basename "$dev")"
+    log "    Device: $dev_name"
+  done
+done
+
 grep -qF "root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED" /proc/cmdline 2>/dev/null || exit 0
 log "Running from updater rootfs (root=PARTLABEL=$ROOT_PARTLABEL_REQUIRED in cmdline); proceeding with update."
 
@@ -256,8 +268,19 @@ for dev in /sys/class/block/*; do
   [ -b "/dev/$(basename "$dev")" ] && log "  $(basename "$dev")"
 done
 
+log "Probing for eMMC (mmc0) explicitly..."
+if [ -e /sys/class/mmc_host/mmc0/rescan ]; then
+  echo 1 >/sys/class/mmc_host/mmc0/rescan 2>/dev/null || true
+  log "Triggered mmc0 rescan"
+fi
+for ctrl in /sys/class/mmc_host/mmc0/mmc0:*; do
+  if [ -d "$ctrl" ]; then
+    log "Found eMMC device: $(basename "$ctrl")"
+  fi
+done
+
 if command -v mmc >/dev/null 2>&1; then
-  log "Triggering MMC rescan..."
+  log "Triggering MMC rescan via mmc command..."
   mmc rescan 2>/dev/null || true
 fi
 
