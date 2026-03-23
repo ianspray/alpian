@@ -251,8 +251,24 @@ if [ ! -f "$PAYLOAD_FILE" ] || [ ! -f "$PAYLOAD_SHA256" ]; then
   exit 1
 fi
 
+log "Available block devices before wait:"
+for dev in /sys/class/block/*; do
+  [ -b "/dev/$(basename "$dev")" ] && log "  $(basename "$dev")"
+done
+
+if command -v mmc >/dev/null 2>&1; then
+  log "Triggering MMC rescan..."
+  mmc rescan 2>/dev/null || true
+fi
+
 i=0
 while [ ! -b "$TARGET_DEVICE" ] && [ "$i" -lt "$TARGET_WAIT_SECONDS" ]; do
+  if [ "$i" -eq 0 ] || [ "$((i % 10))" -eq 0 ]; then
+    log "Wait iteration $i: checking for $TARGET_DEVICE"
+    for dev in /sys/class/block/*; do
+      [ -b "/dev/$(basename "$dev")" ] && log "  found /dev/$(basename "$dev")"
+    done
+  fi
   i=$((i + 1))
   sleep 1
 done
