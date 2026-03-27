@@ -20,13 +20,13 @@ A custom Alpine Linux distribution for aarch64 SBC appliances.
 ### 1. Build the container
 
 ```bash
-make container-build CONTAINER_RUNTIME=docker  # or podman
+make container-build CONTAINER_RUNTIME=podman  # or docker
 ```
 
 ### 2. Run the container
 
 ```bash
-make container-run CONTAINER_RUNTIME=docker
+make container-run CONTAINER_RUNTIME=podman
 ```
 
 ### 3. Inside the container, build for a specific board

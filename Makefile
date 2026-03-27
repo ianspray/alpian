@@ -11,7 +11,7 @@ CONFIG_DIR := $(BUILD_DIR)/config
 
 BOARDS := rock5b rock5c rock5e rock3b rpi4 rpi5
 
-CONTAINER_RUNTIME ?= docker
+CONTAINER_RUNTIME ?= podman
 CONTAINER_NAME := alpian-builder
 
 all: help
@@ -50,47 +50,47 @@ fetch:
 	@echo "=== Stage: Fetch remote assets ==="
 	@mkdir -p $(CACHE_DIR)/{kernel,uboot,apk,rootfs}
 	@for board in $(BOARDS); do \
-		$(SCRIPTS_DIR)/fetch/$$board.sh; \
+		CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/fetch/$$board.sh; \
 	done
 
 uboot:
 	@echo "=== Stage: Build U-Boot ==="
 	@for board in $(BOARDS); do \
-		$(SCRIPTS_DIR)/uboot/$$board.sh; \
+		CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/uboot/$$board.sh; \
 	done
 
 kernel:
 	@echo "=== Stage: Build Linux kernel ==="
 	@for board in $(BOARDS); do \
-		$(SCRIPTS_DIR)/kernel/$$board.sh; \
+		CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/kernel/$$board.sh; \
 	done
 
 apk:
 	@echo "=== Stage: Build custom APK packages ==="
-	@$(SCRIPTS_DIR)/apk/build.sh
+	@CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/apk/build.sh
 
 root:
 	@echo "=== Stage: Build root filesystem ==="
 	@for board in $(BOARDS); do \
-		$(SCRIPTS_DIR)/root/$$board.sh; \
+		CACHE_DIR=$(CACHE_DIR) ROOTFS_DIR=$(BUILD_DIR)/rootfs $(SCRIPTS_DIR)/root/$$board.sh; \
 	done
 
 image:
 	@echo "=== Stage: Build final disk image ==="
 	@for board in $(BOARDS); do \
-		$(SCRIPTS_DIR)/image/$$board.sh; \
+		ROOTFS_DIR=$(BUILD_DIR)/rootfs OUTPUT_DIR=$(OUTPUT_DIR) $(SCRIPTS_DIR)/image/$$board.sh; \
 	done
 
 build-%:
 	@board=$(filter-out build-,$(MAKECMDGOALS)); \
 	for b in $(BOARDS); do \
 		if [ "$$b" = "$$board" ]; then \
-			$(SCRIPTS_DIR)/fetch/$$board.sh; \
-			$(SCRIPTS_DIR)/uboot/$$board.sh; \
-			$(SCRIPTS_DIR)/kernel/$$board.sh; \
-			$(SCRIPTS_DIR)/apk/build.sh; \
-			$(SCRIPTS_DIR)/root/$$board.sh; \
-			$(SCRIPTS_DIR)/image/$$board.sh; \
+			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/fetch/$$board.sh; \
+			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/uboot/$$board.sh; \
+			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/kernel/$$board.sh; \
+			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/apk/build.sh; \
+			CACHE_DIR=$(CACHE_DIR) ROOTFS_DIR=$(BUILD_DIR)/rootfs $(SCRIPTS_DIR)/root/$$board.sh; \
+			ROOTFS_DIR=$(BUILD_DIR)/rootfs OUTPUT_DIR=$(OUTPUT_DIR) $(SCRIPTS_DIR)/image/$$board.sh; \
 			break; \
 		fi; \
 	done

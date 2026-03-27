@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Ian Spray
-FROM alpine:latest
+FROM arm64v8/alpine:latest
 
 RUN apk add --no-cache \
     alpine-sdk \
@@ -18,12 +18,9 @@ RUN apk add --no-cache \
     sfdisk \
     kmod \
     linux-headers \
-    uboot-tools \
+    u-boot-tools \
     py3-yaml \
     python3 \
-    aarch64-linux-gnu \
-    gcc-aarch64-linux-gnu \
-    g++-aarch64-linux-gnu \
     && rm -rf /var/cache/apk/*
 
 WORKDIR /build
