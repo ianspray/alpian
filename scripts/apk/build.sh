@@ -60,7 +60,7 @@ build_apk() {
         cd "$pkgdir"
         if [ -f "APKBUILD" ]; then
             echo "Building $pkgname APK..."
-            abuild -r -v || true
+            abuild rootbld || true
             cp "$pkgdir"/packages/aarch64/*.apk "$OUTPUT_DIR/apk/" 2>/dev/null || true
         fi
     fi
