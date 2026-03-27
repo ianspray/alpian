@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Ian Spray
 
-.PHONY: all build-% clean distclean container-build container-run help
+.PHONY: all build-% clean distclean container-build container-run help fetch uboot kernel apk root image all-boards
 
 BUILD_DIR := $(shell pwd)
 CACHE_DIR := $(BUILD_DIR)/cache
@@ -13,6 +13,8 @@ BOARDS := rock5b rock5c rock5e rock3b rpi4 rpi5
 
 CONTAINER_RUNTIME ?= podman
 CONTAINER_NAME := alpian-builder
+
+IN_CONTAINER := $(shell echo $$IN_CONTAINER)
 
 all: help
 
@@ -35,16 +37,55 @@ help:
 	@echo ""
 
 container-build:
-	$(CONTAINER_RUNTIME) build -t alpian-builder -f build/Dockerfile .
+	$(CONTAINER_RUNTIME) build -t $(CONTAINER_NAME) -f build/Dockerfile .
 
 container-run:
 	$(CONTAINER_RUNTIME) run -it --rm \
+		-e IN_CONTAINER=true \
 		-v $(CACHE_DIR):/var/cache/distfiles \
 		-v $(OUTPUT_DIR):/output \
 		-v $(BUILD_DIR):/build \
 		-w /build \
 		--privileged \
-		alpian-builder
+		$(CONTAINER_NAME)
+
+ifneq ($(IN_CONTAINER),true)
+container-spawn = $(CONTAINER_RUNTIME) run --rm \
+	-e IN_CONTAINER=true \
+	-e CACHE_DIR=/var/cache/distfiles \
+	-v $(CACHE_DIR):/var/cache/distfiles \
+	-v $(OUTPUT_DIR):/output \
+	-v $(BUILD_DIR):/build \
+	-w /build \
+	--privileged \
+	$(CONTAINER_NAME) \
+	make --no-print-directory $(1)
+
+fetch: 
+	$(call container-spawn,fetch)
+
+uboot: 
+	$(call container-spawn,uboot)
+
+kernel: 
+	$(call container-spawn,kernel)
+
+apk: 
+	$(call container-spawn,apk)
+
+root: 
+	$(call container-spawn,root)
+
+image: 
+	$(call container-spawn,image)
+
+build-%: 
+	$(call container-spawn,build-$(filter-out build-,$(MAKECMDGOALS)))
+
+all-boards: 
+	$(call container-spawn,all-boards)
+
+else
 
 fetch:
 	@echo "=== Stage: Fetch remote assets ==="
@@ -99,6 +140,8 @@ all-boards:
 	@for board in $(BOARDS); do \
 		make build-$$board; \
 	done
+
+endif
 
 clean:
 	@echo "=== Cleaning build artifacts ==="
