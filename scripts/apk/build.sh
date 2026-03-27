@@ -33,9 +33,9 @@ mkdir -p ~/.abuild
 if [ ! -f ~/.abuild/abuild.rsa ]; then
     echo "=== Generating APK signing keys ==="
     ssh-keygen -t rsa -b 4096 -m PEM -f ~/.abuild/abuild.rsa -N "" -C "build@alpian"
-    cp ~/.abuild/abuild.rsa.pub /etc/apk/keys/
 fi
 
+cp ~/.abuild/abuild.rsa.pub /etc/apk/keys/ 2>/dev/null || true
 cp ~/.abuild/abuild.rsa ~/.abuild/abuild.rsa.pub /build/.abuild/ 2>/dev/null || true
 
 echo "PACKAGER_PRIVKEY=$HOME/.abuild/abuild.rsa" > ~/.abuild/abuild.conf
@@ -60,12 +60,11 @@ source="keychain-$pkgver.tar.gz::https://github.com/funtoo/keychain/archive/refs
 depends="openssl"
 
 build() {
-    ./configure --prefix=/usr --sysconfdir=/etc
     make
 }
 
 package() {
-    make DESTDIR="$pkgdir" install
+    make PREFIX="$pkgdir/usr" install
 }
 APKBUILD_EOF
 
