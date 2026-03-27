@@ -22,7 +22,7 @@ echo "=== Building custom APK packages ==="
 mkdir -p "$OUTPUT_DIR/apk"
 
 if [ "$(id -u)" = "0" ]; then
-    exec su build -c "ABUILD_KEYS=$ABUILD_KEYS APORTS_DIR=$APORTS_DIR OUTPUT_DIR=$OUTPUT_DIR CACHE_DIR=$CACHE_DIR /build/scripts/apk/run.sh"
+    export ABUILD_ROOT=1
 fi
 
 export ABUILD_NOCOLOR=1
@@ -35,11 +35,7 @@ echo 'CHOST="aarch64-alpine-linux-musl"' >> ~/.abuild/abuild.conf
 cp "$ABUILD_KEYS/abuild.rsa.pub" /etc/apk/keys/ 2>/dev/null || true
 
 echo "=== Updating Alpine package index ==="
-echo "Checking repository configuration..."
-cat /etc/apk/repositories
-echo "Testing network connectivity..."
-wget -q -O /dev/null https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/APKINDEX.tar.gz && echo "Network OK" || echo "Network FAILED"
-apk update || echo "apk update failed, continuing anyway..."
+apk update
 
 echo "=== Building packages from $APORTS_DIR ==="
 for apkbuild in "$APORTS_DIR"/*/*/APKBUILD; do
