@@ -23,8 +23,8 @@ mkdir -p "$OUTPUT_DIR/apk"
 
 if ! id abuild >/dev/null 2>&1; then
     echo "=== Creating abuild user ==="
-    adduser -D -s /bin/sh abuild
-    addgroup abuild abuild
+    addgroup -S abuild 2>/dev/null || true
+    adduser -D -s /bin/sh -G abuild abuild
 fi
 
 ABUILD_HOME="$(getent passwd abuild | cut -d: -f6)"
@@ -54,8 +54,8 @@ for apkbuild in "$APORTS_DIR"/*/*/APKBUILD; do
         pkgdir="$(dirname "$apkbuild")"
         pkgname="$(basename "$pkgdir")"
         echo "Building $pkgname..."
-        su-exec abuild sh -c "cd $pkgdir && abuild checksum 2>/dev/null || true"
-        su-exec abuild sh -c "cd $pkgdir && abuild -r" 2>&1 || echo "Failed to build $pkgname"
+        su - abuild -c "cd $pkgdir && abuild checksum 2>/dev/null || true"
+        su - abuild -c "cd $pkgdir && abuild -r" 2>&1 || echo "Failed to build $pkgname"
     fi
 done
 
