@@ -33,21 +33,17 @@ if [ "$(id -u)" = "0" ]; then
     fi
 
     cp /build/.abuild/abuild.rsa.pub /etc/apk/keys/
+    cp /build/.abuild/abuild.rsa /home/build/.abuild/
+    cp /build/.abuild/abuild.rsa.pub /home/build/.abuild/
+    chown -R build:build /home/build
 
     exec su - build -c "PACKAGES_DIR=$PACKAGES_DIR OUTPUT_DIR=$OUTPUT_DIR CACHE_DIR=$CACHE_DIR /build/scripts/apk/build.sh"
 fi
 
 export ABUILD_NOCOLOR=1
 export ABUILD_LOG=1
+export PACKAGER_PRIVKEY="$HOME/.abuild/abuild.rsa"
 mkdir -p ~/.abuild
-
-if [ ! -f ~/.abuild/abuild.rsa ]; then
-    echo "=== Copying APK signing keys ==="
-    cp /build/.abuild/abuild.rsa ~/.abuild/
-    cp /build/.abuild/abuild.rsa.pub ~/.abuild/
-    chmod 600 ~/.abuild/abuild.rsa
-    chmod 644 ~/.abuild/abuild.rsa.pub
-fi
 
 echo "PACKAGER_PRIVKEY=$HOME/.abuild/abuild.rsa" > ~/.abuild/abuild.conf
 echo 'CHOST="aarch64-alpine-linux-musl"' >> ~/.abuild/abuild.conf
