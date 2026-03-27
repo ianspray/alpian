@@ -36,6 +36,7 @@ chown -R 1000:1000 "$BUILD_DIR"
 chmod 600 "$BUILD_DIR/.abuild/abuild.rsa"
 chmod 644 "$BUILD_DIR/.abuild/abuild.rsa.pub"
 
+export HOME="$BUILD_DIR"
 export ABUILD_NOCOLOR=1
 export ABUILD_NOLOG=1
 export PACKAGER_PRIVKEY="$BUILD_DIR/.abuild/abuild.rsa"
