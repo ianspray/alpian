@@ -23,6 +23,7 @@ mkdir -p "$OUTPUT_DIR/apk"
 
 BUILD_DIR="/tmp/abuild"
 mkdir -p "$BUILD_DIR/.abuild" "$BUILD_DIR/packages"
+mkdir -p "$BUILD_DIR/packages/alpian/aarch64"
 chown -R 1000:1000 "$BUILD_DIR"
 
 chmod 700 "$ABUILD_KEYS"
