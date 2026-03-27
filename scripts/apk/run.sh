@@ -32,6 +32,8 @@ export PACKAGER_PRIVKEY="$ABUILD_KEYS/abuild.rsa"
 echo "PACKAGER_PRIVKEY=$ABUILD_KEYS/abuild.rsa" > ~/.abuild/abuild.conf
 echo 'CHOST="aarch64-alpine-linux-musl"' >> ~/.abuild/abuild.conf
 
+cp "$ABUILD_KEYS/abuild.rsa.pub" /etc/apk/keys/ 2>/dev/null || true
+
 echo "=== Updating Alpine package index ==="
 apk update
 
