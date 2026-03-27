@@ -26,6 +26,8 @@ if [ "$(id -u)" = "0" ]; then
     chown -R build:build /build
     mkdir -p /var/log/abuild
     chown -R build:build /var/log/abuild
+    mkdir -p /etc/apk/keys
+    chown -R build:build /etc/apk/keys
 
     if [ ! -f /build/.abuild/abuild.rsa ]; then
         echo "=== Generating APK signing keys ==="
@@ -91,7 +93,7 @@ build_apk() {
         cd "$pkgdir"
         if [ -f "APKBUILD" ]; then
             echo "Building $pkgname APK..."
-            abuild -r
+            abuild -R
             cp "$pkgdir"/packages/aarch64/*.apk "$OUTPUT_DIR/apk/" 2>/dev/null || true
         fi
     fi
