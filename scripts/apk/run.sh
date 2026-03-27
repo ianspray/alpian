@@ -39,6 +39,7 @@ chmod 644 "$BUILD_DIR/.abuild/abuild.rsa.pub"
 export ABUILD_NOCOLOR=1
 export ABUILD_NOLOG=1
 export PACKAGER_PRIVKEY="$BUILD_DIR/.abuild/abuild.rsa"
+export PACKAGERDIR="$BUILD_DIR/packages"
 
 echo "=== Updating Alpine package index ==="
 apk update
