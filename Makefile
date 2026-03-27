@@ -8,6 +8,7 @@ CACHE_DIR := $(BUILD_DIR)/cache
 OUTPUT_DIR := $(BUILD_DIR)/output
 SCRIPTS_DIR := $(BUILD_DIR)/scripts
 CONFIG_DIR := $(BUILD_DIR)/config
+ABUILD_DIR := $(BUILD_DIR)/.abuild
 
 BOARDS := rock5b rock5c rock5e rock3b rpi4 rpi5
 
@@ -56,6 +57,7 @@ container-spawn = $(CONTAINER_RUNTIME) run --rm \
 	-v $(CACHE_DIR):/var/cache/distfiles \
 	-v $(OUTPUT_DIR):/output \
 	-v $(BUILD_DIR):/build \
+	-v $(ABUILD_DIR):/build/.abuild \
 	-w /build \
 	--privileged \
 	$(CONTAINER_NAME) \
@@ -63,6 +65,13 @@ container-spawn = $(CONTAINER_RUNTIME) run --rm \
 
 setup-dirs:
 	@mkdir -p $(CACHE_DIR)/{kernel,uboot,apk,rootfs} $(OUTPUT_DIR)
+
+setup-abuild-keys:
+	@mkdir -p $(ABUILD_DIR)
+	@if [ ! -f $(ABUILD_DIR)/abuild.rsa ]; then \
+		echo "=== Generating APK signing keys ==="; \
+		ssh-keygen -t rsa -b 4096 -m PEM -f $(ABUILD_DIR)/abuild.rsa -N "" -C "build@alpian"; \
+	fi
 
 fetch: setup-dirs
 	$(call container-spawn,fetch)
@@ -73,7 +82,7 @@ uboot: setup-dirs
 kernel: setup-dirs
 	$(call container-spawn,kernel)
 
-apk: setup-dirs
+apk: setup-dirs setup-abuild-keys
 	$(call container-spawn,apk)
 
 root: setup-dirs
@@ -111,7 +120,7 @@ kernel:
 
 apk:
 	@echo "=== Stage: Build custom APK packages ==="
-	@CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/apk/build.sh
+	@ABUILD_KEYS=/build/.abuild CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/apk/run.sh
 
 root:
 	@echo "=== Stage: Build root filesystem ==="
@@ -125,14 +134,14 @@ image:
 		ROOTFS_DIR=$(BUILD_DIR)/rootfs OUTPUT_DIR=$(OUTPUT_DIR) $(SCRIPTS_DIR)/image/$$board.sh; \
 	done
 
-build-%:
+build-%: setup-dirs setup-abuild-keys
 	@board=$(filter-out build-,$(MAKECMDGOALS)); \
 	for b in $(BOARDS); do \
 		if [ "$$b" = "$$board" ]; then \
 			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/fetch/$$board.sh; \
 			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/uboot/$$board.sh; \
 			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/kernel/$$board.sh; \
-			CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/apk/build.sh; \
+			ABUILD_KEYS=/build/.abuild CACHE_DIR=$(CACHE_DIR) $(SCRIPTS_DIR)/apk/run.sh; \
 			CACHE_DIR=$(CACHE_DIR) ROOTFS_DIR=$(BUILD_DIR)/rootfs $(SCRIPTS_DIR)/root/$$board.sh; \
 			ROOTFS_DIR=$(BUILD_DIR)/rootfs OUTPUT_DIR=$(OUTPUT_DIR) $(SCRIPTS_DIR)/image/$$board.sh; \
 			break; \
