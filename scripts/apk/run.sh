@@ -35,7 +35,11 @@ echo 'CHOST="aarch64-alpine-linux-musl"' >> ~/.abuild/abuild.conf
 cp "$ABUILD_KEYS/abuild.rsa.pub" /etc/apk/keys/ 2>/dev/null || true
 
 echo "=== Updating Alpine package index ==="
-apk update
+echo "Checking repository configuration..."
+cat /etc/apk/repositories
+echo "Testing network connectivity..."
+wget -q -O /dev/null https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/APKINDEX.tar.gz && echo "Network OK" || echo "Network FAILED"
+apk update || echo "apk update failed, continuing anyway..."
 
 echo "=== Building packages from $APORTS_DIR ==="
 for apkbuild in "$APORTS_DIR"/*/*/APKBUILD; do
