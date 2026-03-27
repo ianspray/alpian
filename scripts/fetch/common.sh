@@ -114,8 +114,8 @@ fetch_genimage() {
             git clone --depth 1 https://github.com/pengutronix/genimage "$GENIMAGE_DIR"
         fi
         cd "$GENIMAGE_DIR"
-        if [ ! -f "Makefile" ]; then
-            ./bootstrap
+        if [ ! -f "configure" ]; then
+            ./autogen.sh
         fi
         ./configure
         make
