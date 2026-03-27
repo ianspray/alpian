@@ -41,6 +41,9 @@ cp ~/.abuild/abuild.rsa ~/.abuild/abuild.rsa.pub /build/.abuild/ 2>/dev/null || 
 echo "PACKAGER_PRIVKEY=$HOME/.abuild/abuild.rsa" > ~/.abuild/abuild.conf
 echo 'CHOST="aarch64-alpine-linux-musl"' >> ~/.abuild/abuild.conf
 
+echo "=== Updating Alpine package index ==="
+apk update
+
 setup_alpine_sdk() {
     if [ ! -d "$PACKAGES_DIR"/keychain ]; then
         mkdir -p "$PACKAGES_DIR"/keychain
