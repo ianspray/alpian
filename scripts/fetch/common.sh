@@ -105,28 +105,8 @@ fetch_rootfs() {
     fi
 }
 
-fetch_genimage() {
-    echo "Checking for genimage"
-    GENIMAGE_DIR="$CACHE_DIR/tools/genimage"
-    if ! command -v genimage >/dev/null 2>&1; then
-        mkdir -p "$CACHE_DIR/tools"
-        if [ ! -d "$GENIMAGE_DIR" ]; then
-            git clone --depth 1 https://github.com/pengutronix/genimage "$GENIMAGE_DIR"
-        fi
-        cd "$GENIMAGE_DIR"
-        if [ ! -f "configure" ]; then
-            ./autogen.sh
-        fi
-        ./configure
-        make
-        make install DESTDIR="$CACHE_DIR/tools/install"
-        export PATH="$CACHE_DIR/tools/install/bin:$PATH"
-    fi
-}
-
 fetch_kernel
 fetch_uboot
 fetch_rootfs
-fetch_genimage
 
 echo "=== Fetch complete for $BOARD ==="

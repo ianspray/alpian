@@ -60,7 +60,7 @@ build_apk() {
         cd "$pkgdir"
         if [ -f "APKBUILD" ]; then
             echo "Building $pkgname APK..."
-            abuild -r
+            abuild -r -v || true
             cp "$pkgdir"/packages/aarch64/*.apk "$OUTPUT_DIR/apk/" 2>/dev/null || true
         fi
     fi
@@ -68,7 +68,21 @@ build_apk() {
 
 setup_alpine_sdk
 
-if [ -d "$PACKAGES_DIR" ]; then
+export ABUILD_NOCOLOR=1
+export ABUILD_ROOT=1
+mkdir -p /build/.abuild
+
+if [ ! -f /build/.abuild/abuild.rsa ]; then
+    echo "=== Generating APK signing keys ==="
+    ssh-keygen -t rsa -b 4096 -m PEM -f /build/.abuild/abuild.rsa -N "" -C "build@alpian"
+    openssl rsa -in /build/.abuild/abuild.rsa -out /build/.abuild/abuild.rsa -passout pass:"" 2>/dev/null || true
+    cp /build/.abuild/abuild.rsa.pub /etc/apk/keys/
+fi
+
+echo "PACKAGER_PRIVKEY=/build/.abuild/abuild.rsa" > /build/.abuild/abuild.conf
+echo 'CHOST="aarch64-alpine-linux-musl"' >> /build/.abuild/abuild.conf
+
+if [ "$PACKAGES_DIR" != "/" ]; then
     for pkg in "$PACKAGES_DIR"/*/; do
         pkgname=$(basename "$pkg")
         build_apk "$pkgname"

@@ -27,11 +27,20 @@ RUN apk add --no-cache \
     pkgconf \
     confuse \
     confuse-dev \
+    openssh \
+    openssl \
     && rm -rf /var/cache/apk/*
 
 WORKDIR /build
 
-RUN mkdir -p /var/cache/distfiles /var/cache/apkcache /build/config
+RUN mkdir -p /var/cache/distfiles /var/cache/apkcache /build/config \
+    && git clone --depth 1 https://github.com/pengutronix/genimage /tmp/genimage \
+    && cd /tmp/genimage \
+    && ./autogen.sh \
+    && ./configure \
+    && make -j$(nproc) \
+    && make install \
+    && rm -rf /tmp/genimage
 
 COPY config/*.conf /build/config/
 
