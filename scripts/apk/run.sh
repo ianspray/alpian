@@ -21,29 +21,17 @@ echo "=== Building custom APK packages ==="
 
 mkdir -p "$OUTPUT_DIR/apk"
 
-if ! id abuild >/dev/null 2>&1; then
-    echo "=== Creating abuild user ==="
-    addgroup -S abuild 2>/dev/null || true
-    adduser -D -s /bin/sh -G abuild abuild
-fi
-
-ABUILD_HOME="$(getent passwd abuild | cut -d: -f6)"
-
-cp "$ABUILD_KEYS/abuild.rsa.pub" /etc/apk/keys/ 2>/dev/null || true
-
 chmod 700 "$ABUILD_KEYS"
 chmod 600 "$ABUILD_KEYS/abuild.rsa"
 chmod 644 "$ABUILD_KEYS/abuild.rsa.pub"
 
-cp -r "$ABUILD_KEYS" "$ABUILD_HOME/.abuild"
-chown -R abuild:abuild "$ABUILD_HOME/.abuild"
-
-chmod 700 "$ABUILD_HOME/.abuild"
-chmod 600 "$ABUILD_HOME/.abuild/abuild.rsa"
-chmod 644 "$ABUILD_HOME/.abuild/abuild.rsa.pub"
-
 export ABUILD_NOCOLOR=1
 export ABUILD_NOLOG=1
+export PACKAGER_PRIVKEY="$ABUILD_KEYS/abuild.rsa"
+export HOME=/home/build
+
+mkdir -p "$HOME/packages"
+chmod 755 "$HOME"
 
 echo "=== Updating Alpine package index ==="
 apk update
@@ -54,12 +42,13 @@ for apkbuild in "$APORTS_DIR"/*/*/APKBUILD; do
         pkgdir="$(dirname "$apkbuild")"
         pkgname="$(basename "$pkgdir")"
         echo "Building $pkgname..."
-        su - abuild -c "cd $pkgdir && abuild checksum 2>/dev/null || true"
-        su - abuild -c "cd $pkgdir && abuild -r" 2>&1 || echo "Failed to build $pkgname"
+        cd "$pkgdir"
+        abuild checksum 2>/dev/null || true
+        abuild -r 2>&1 || echo "Failed to build $pkgname"
     fi
 done
 
-for apk in "$ABUILD_HOME"/packages/aarch64/*.apk; do
+for apk in "$HOME"/packages/aarch64/*.apk; do
     if [ -f "$apk" ]; then
         cp "$apk" "$OUTPUT_DIR/apk/"
         echo "Copied: $apk"
