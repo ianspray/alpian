@@ -43,7 +43,6 @@ container-build:
 container-run:
 	$(CONTAINER_RUNTIME) run -it --rm \
 		-e IN_CONTAINER=true \
-		-u $(shell id -u):$(shell id -g) \
 		-v $(CACHE_DIR):/var/cache/distfiles \
 		-v $(OUTPUT_DIR):/output \
 		-v $(BUILD_DIR):/build \
@@ -55,7 +54,6 @@ ifneq ($(IN_CONTAINER),true)
 container-spawn = $(CONTAINER_RUNTIME) run --rm \
 	-e IN_CONTAINER=true \
 	-e CACHE_DIR=/var/cache/distfiles \
-	-u $(shell id -u):$(shell id -g) \
 	-v $(CACHE_DIR):/var/cache/distfiles \
 	-v $(OUTPUT_DIR):/output \
 	-v $(BUILD_DIR):/build \
