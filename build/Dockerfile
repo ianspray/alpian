@@ -40,9 +40,9 @@ RUN mkdir -p /var/cache/distfiles /var/cache/apkcache /build/config \
     && ./configure \
     && make -j$(nproc) \
     && make install \
-    && rm -rf /tmp/genimage \
-    && adduser -D build \
-    && addgroup build abuild
+    && rm -rf /tmp/genimage
+
+RUN adduser -D build && addgroup build abuild
 
 COPY config/*.conf /build/config/
 
