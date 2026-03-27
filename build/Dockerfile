@@ -25,7 +25,8 @@ RUN apk add --no-cache \
     automake \
     libtool \
     pkgconf \
-    libconfuse-dev \
+    confuse \
+    confuse-dev \
     && rm -rf /var/cache/apk/*
 
 WORKDIR /build
