@@ -14,7 +14,7 @@ BOARD		?= e25
 
 include boards/$(BOARD)/$(BOARD).env
 
-.PHONY: populate-cache build-tools image build build-linx build-uboot build-rootfs build-bootfs fetch fetch-apk fetch-linux fetch-uboot clean index help
+.PHONY: populate-cache build-tools image build build-linx build-uboot build-rootfs build-bootfs fetch fetch-apk fetch-linux fetch-uboot clean index help abuild-keys
 
 $(APKFETCH):
 	$(MAKE) -C $(APKFETCH_PATH)
@@ -41,6 +41,14 @@ build-tools: $(APKFETCH) fetch-apk populate-cache
 	podman build \
 	-f tools/Containerfile \
 	-t alpian-builder .
+
+build/aports/abuild.rsa:
+	openssl genrsa -out build/aports/abuild.rsa 4096
+
+build/aports/abuild.rsa.pub: build/aports/abuild.rsa
+	openssl rsa -in build/aports/abuild.rsa -pubout -out build/aports/abuild.rsa.pub
+
+abuild-keys: build/aports/abuild.rsa build/aports/abuild.rsa.pub
 
 # - - - - - -
 
@@ -102,7 +110,7 @@ build-uboot: build-tools
 
 # gather the assets required in order to be able to build a disc image, but
 # do not create the final bootable/flashable output binary itself
-build: build-tools build-linux build-uboot
+build: build-tools build-linux build-uboot abuild-keys
 	podman run --rm -it \
 	-v ./cache:/cache \
 	-v ./boards:/boards:ro \
@@ -112,7 +120,7 @@ build: build-tools build-linux build-uboot
 	alpian-builder \
 	sh alpian-build.sh
 
-# assemble the rootfs and bootfs into a fucntional image for a physical device
+# assemble the rootfs and bootfs into a functional image for a physical device
 image: build-tools build
 	podman run --rm -it \
 	-v ./cache:/cache \
