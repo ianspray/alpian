@@ -6,6 +6,7 @@
 # ensure that the changes are available to use on subsequent build commands
 set -e
 
+ALPINE_VER="v3.23"
 CACHE_DIR="/cache"
 BOARDS_DIR="/boards"
 BUILD_DIR="/build"
@@ -36,12 +37,28 @@ setup_builder() {
   chown builder:builder /home/builder/.abuild/*
   cp -f "${APORTS_SRC}/abuild.rsa.pub" /etc/apk/keys
 
-  echo "/apk-cache" > /etc/apk/repositories
-#  cd /apk-cache/aarch64
-#  apk index -o APKINDEX.tar.gz *.apk
-#  cd -
-  echo "${BUILD_DIR}/apk/alpian" >> /etc/apk/repositories
-  echo "${BUILD_DIR}/apk/${BOARD}" >> /etc/apk/repositories
+  # remove any stale indexes that would cause signature mismatch
+  rm -f "${BUILD_DIR}/apk/alpian/aarch64/APKINDEX.tar.gz"
+  rm -f "${BUILD_DIR}/apk/${BOARD}/aarch64/APKINDEX.tar.gz"
+
+  # re-create indexes signed with the correct key if packages exist
+  for dir in "${BUILD_DIR}/apk/alpian/aarch64" "${BUILD_DIR}/apk/${BOARD}/aarch64"; do
+    mkdir -p "$dir"
+    if ls "$dir"/*.apk 2>/dev/null | grep -q .; then
+      apk index -o "$dir/APKINDEX.tar.gz" "$dir"/*.apk
+      abuild-sign -k "${APORTS_SRC}/abuild.rsa" "$dir/APKINDEX.tar.gz"
+    fi
+  done
+
+  # keep standard alpine repos for dependency resolution
+  # /etc/apk/cache is already bind-mounted with the pre-fetched .apk files
+  # so network hits will be avoided for anything already cached
+  cat > /etc/apk/repositories <<EOF
+https://dl-cdn.alpinelinux.org/alpine/${ALPINE_VER}/main
+https://dl-cdn.alpinelinux.org/alpine/${ALPINE_VER}/community
+${BUILD_DIR}/apk/alpian
+${BUILD_DIR}/apk/${BOARD}
+EOF
 }
 
 build_aports() {
@@ -54,14 +71,6 @@ build_aports() {
       su -s /bin/sh builder -c "abuild-pkg.sh ${PKG_DIR}" 2>&1 || echo "Failed to build '${PKG_NAME}'"
     fi
   done
-
-  cd ${BUILD_DIR}/apk/alpian/aarch64
-  apk index -o APKINDEX.tar.gz *.apk
-  cd -
-
-  cd ${BUILD_DIR}/apk/${BOARD}/aarch64
-  apk index -o APKINDEX.tar.gz *.apk
-  cd -
 }
 
 build_linux() {
@@ -74,7 +83,9 @@ build_uboot() {
 
 build_rootfs() {
   echo "build_rootfs()"
-  mkdir -p "${ROOTFS}"
+  mkdir -p "${ROOTFS}/etc/apk"
+  apk --root ${ROOTFS} add --initdb
+  cp /etc/apk/repositories $ROOTFS/etc/apk
   # add the packages common for all boards
   echo "Common..."
   source ${BOARDS_DIR}/common/packages.sh

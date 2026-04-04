@@ -22,7 +22,7 @@ find_pkgs() {
 fetch_pkg() {
     pkg=$1
 
-    apk info --quiet --recursive --depends "$pkg" 2>/dev/null \
+    { echo "$pkg"; apk info --quiet --recursive --depends "$pkg" 2>/dev/null; } \
 	| grep -v '^so:'  \
 	| grep -v '^cmd:' \
 	| grep -v '^/'    \
