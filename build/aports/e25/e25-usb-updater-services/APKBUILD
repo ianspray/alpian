@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Maintainer: IWS <iws@toothless.local>
+# Maintainer: Ian Spray <redacted@laptop.local>
 pkgname=e25-usb-updater-services
 pkgver=0.1.0
 pkgrel=0

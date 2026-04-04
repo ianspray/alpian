@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Maintainer: IWS <iws@toothless.local>
+# Maintainer: Ian Spray <redacted@laptop.local>
 pkgname=r3s-mac-services
 pkgver=0.2.0
 pkgrel=0

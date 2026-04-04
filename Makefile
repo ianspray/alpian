@@ -112,7 +112,8 @@ build-uboot: build-tools
 # gather the assets required in order to be able to build a disc image, but
 # do not create the final bootable/flashable output binary itself
 #build: build-tools build-linux build-uboot abuild-keys
-build: build-tools
+#build: build-tools
+build:
 	podman run --rm -it \
 	-v ./cache:/cache \
 	-v ./boards:/boards:ro \

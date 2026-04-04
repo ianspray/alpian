@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Maintainer: IWS <iws@toothless.local>
+# Maintainer: Ian Spray <redacted@laptop.local>
 pkgname=e52c-openrc-services
 pkgver=0.3.0
 pkgrel=0
