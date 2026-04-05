@@ -15,6 +15,13 @@ RUN apk update && \
     e2fsprogs \
     dosfstools \
     mtools \
+    bison \
+    flex \
+    gcc \
+    bash bc bison flex openssl-dev elfutils-dev perl \
+    python3 py3-setuptools python3-dev py3-elftools swig \
+    gnutls-dev \
+    dtc \
     busybox \
     util-linux \
     sudo \

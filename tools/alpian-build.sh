@@ -19,6 +19,7 @@ LINUX_SRC="${CACHE_DIR}/linux/${KERNEL_DIR}/kernel"
 LINUX_CFG="${BOARDS_DIR}/${BOARD}/linux.config"
 UBOOT_SRC="${CACHE_DIR}/u-boot/${UBOOT_DIR}/u-boot"
 UBOOT_CFG="${BOARDS_DIR}/${BOARD}/u-boot.config"
+TPL_SRC="${CACHE_DIR}/rockchip-tpl"
 APORTS_SRC="${BUILD_DIR}/aports"
 
 ROOTFS="${WORK_DIR}/rootfs"
@@ -78,13 +79,17 @@ build_aports() {
 
 build_linux() {
   echo "build_linux()"
+  if [ -z ${KERNEL_REPO} ]; then
+    return
+  fi
   mkdir -p ${WORK}/linux
   cd "${LINUX_SRC}"
-  make clean
+  make mrproper
+  make O=${WORK}/linux clean
   # take the preferred defaults
-  cp "${LINUX_CFG}" .config
+  cp "${LINUX_CFG}" ${WORK}/linux/.config
   # fold in any new options with sensible defaults
-  make olddefconfig
+  make O=${WORK}/linux olddefconfig
   # build the kernel, dtb and modules
   make O=${WORK}/linux -j$(nproc) Image dtbs modules
   # construct our own DTB
@@ -101,25 +106,34 @@ build_linux() {
   echo make modules_install
   # show any new options and their defaults
   echo "--- new linux kernel config entries and defaults: ---"
-  make listnewconfig
+  make O=${WORK}/u-boot listnewconfig
   echo "--- new kernel config ends ---"
   cd -
 }
 
 build_uboot() {
   echo "build_uboot()"
+  if [ -z ${UBOOT_REPO} ]; then
+    return
+  fi
   mkdir -p ${WORK}/u-boot
   cd "${UBOOT_SRC}"
-  make clean
+  make mrproper
+  make O=${WORK}/u-boot clean
   # take the preferred defaults
-  cp "${UBOOT_CFG}" .config
+  cp "${UBOOT_CFG}" ${WORK}/u-boot/.config
   # fold in any new options with sensible defaults
-  make olddefconfig
+  make O=${WORK}/u-boot olddefconfig
   # build u-boot
-  make O=${WORK}/u-boot -j$(nproc)
+  # FIXME: this test is poor and needs improvement
+  if [ ! -z ${ROCKCHIP_TPL_FILE} ]; then
+    make O=${WORK}/u-boot -j$(nproc) ROCKCHIP_TPL=${TPL_SRC}/${ROCKCHIP_TPL_FILE} BL31=${TPL_SRC}/${ROCKCHIP_BL31_FILE}
+  else
+    make O=${WORK}/u-boot -j$(nproc)
+  fi
   # show any new options and their defaults
   echo "--- new u-boot config entries and defaults: ---"
-  make listnewconfig
+  make O=${WORK}/u-boot listnewconfig
   echo "--- new u-boot config ends ---"
   cd -
 }
