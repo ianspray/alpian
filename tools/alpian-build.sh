@@ -78,16 +78,25 @@ build_aports() {
 
 build_linux() {
   echo "build_linux()"
+  mkdir -p ${WORK}/linux
   cd "${LINUX_SRC}"
   make clean
   # take the preferred defaults
   cp "${LINUX_CFG}" .config
   # fold in any new options with sensible defaults
   make olddefconfig
-  # build the kernel
-  make
-  # build modules
-  make modules
+  # build the kernel, dtb and modules
+  make O=${WORK}/linux -j$(nproc) Image dtbs modules
+  # construct our own DTB
+  cp "${BOARDS}/${BOARD}/${BOARD}.dts" .
+  # perform any cpp preprocessing of the DTS
+  cpp -nostdinc \
+    -I arch/arm64/boot/dts \
+    -I include \
+    -undef -x assembler-with-cpp \
+    ${BOARD}.dts ${BOARD}.dts.preprocessed
+  # compile DTS into DTB
+  dtc -I dts -O dtb -o ${BOARD}.dtb ${BOARD}.dts.preprocessed
   # FIXME: do I need to execute the code from the following line ?
   echo make modules_install
   # show any new options and their defaults
@@ -99,14 +108,15 @@ build_linux() {
 
 build_uboot() {
   echo "build_uboot()"
+  mkdir -p ${WORK}/u-boot
   cd "${UBOOT_SRC}"
   make clean
   # take the preferred defaults
   cp "${UBOOT_CFG}" .config
   # fold in any new options with sensible defaults
   make olddefconfig
-  # build the kernel
-  make
+  # build u-boot
+  make O=${WORK}/u-boot -j$(nproc)
   # show any new options and their defaults
   echo "--- new u-boot config entries and defaults: ---"
   make listnewconfig
