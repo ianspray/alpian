@@ -2,11 +2,14 @@
 # Copyright (c) 2026 Ian Spray
 
 VERSION                ?= v3.23
-APK_CACHE_DIR          ?= cache/apk-cache
-LINUX_CACHE_DIR        ?= cache/linux
-UBOOT_CACHE_DIR        ?= cache/u-boot
-ROCKCHIP_TPL_CACHE_DIR ?= cache/rockchip-tpl
+CACHE_DIR              ?= cache
+APK_CACHE_DIR          ?= $(CACHE_DIR)/apk-cache
+APK_LIST               ?= $(CACHE_DIR)/apklist.txt
+LINUX_CACHE_DIR        ?= $(CACHE_DIR)/linux/$(KERNEL_DIR)
+UBOOT_CACHE_DIR        ?= $(CACHE_DIR)/u-boot
+ROCKCHIP_TPL_CACHE_DIR ?= $(CACHE_DIR)/rockchip-tpl
 SCAN_DIRS              ?= .
+CLONE_DEPTH            ?= 50
 
 BOARD		       ?= e25
 
@@ -18,12 +21,13 @@ include boards/$(BOARD)/$(BOARD).env
 fetch-apk:
 	podman run --rm \
 		-v $(CURDIR)/cache/apk-cache:/etc/apk/cache \
+		-v $(CURDIR)/cache:/cache \
 		-v $(CURDIR):/src:ro \
 		-v $(CURDIR)/tools:/tools:ro \
 		alpine:3.23.3 \
 		/tools/fetch-apks.sh
 
-build-tools: fetch-apk tools/Containerfile tools/abuild-pkg.sh tools/alpian-build.sh tools/fetch-apks.sh
+build-tools: $(APK_LIST) tools/Containerfile tools/abuild-pkg.sh tools/alpian-build.sh tools/fetch-apks.sh
 	podman build \
 		-f tools/Containerfile \
 		-v $(CURDIR)/cache/apk-cache:/etc/apk/cache \
@@ -42,30 +46,32 @@ abuild-keys: build/aports/abuild.rsa build/aports/abuild.rsa.pub
 
 fetch-linux:
 	mkdir -p $(CURDIR)/$(LINUX_CACHE_DIR); \
-	podman run --rm -it \
-		-v $(CURDIR)/$(LINUX_CACHE_DIR):/work \
-		alpian-builder \
-		/bin/sh -c 'if [ -d $(KERNEL_DIR)/kernel ]; then \
-			git -C $(KERNEL_DIR)/kernel fetch origin && \
-			git -C $(KERNEL_DIR)/kernel reset --hard origin/$(KERNEL_BRANCH) && \
-			git -C $(KERNEL_DIR)/kernel clean -fdx; \
-		else \
-			git clone --branch $(KERNEL_BRANCH) $(KERNEL_REPO) $(KERNEL_DIR); \
-		fi'
+	if [ -d $(CURDIR)/$(LINUX_CACHE_DIR)/kernel.git ]; then \
+		git -C $(CURDIR)/$(LINUX_CACHE_DIR) fetch; \
+	else \
+		git -C $(CURDIR)/$(LINUX_CACHE_DIR) \
+			clone \
+			--bare \
+			--depth=$(CLONE_DEPTH) \
+			--single-branch \
+			--branch $(KERNEL_BRANCH) \
+			$(KERNEL_REPO); \
+	fi
 
 fetch-uboot:
 ifdef UBOOT_REPO
 	mkdir -p $(CURDIR)/$(UBOOT_CACHE_DIR); \
-	podman run --rm -it \
-		-v $(CURDIR)/$(UBOOT_CACHE_DIR):/work \
-		alpian-builder \
-		/bin/sh -c 'if [ -d $(UBOOT_DIR)/u-boot ]; then \
-			git -C $(UBOOT_DIR)/u-boot fetch origin && \
-			git -C $(UBOOT_DIR)/u-boot reset --hard $(UBOOT_BRANCH) && \
-			git -C $(UBOOT_DIR)/u-boot clean -fdx; \
-		else \
-			git clone --branch $(UBOOT_BRANCH) $(UBOOT_REPO) $(UBOOT_DIR)/u-boot; \
-		fi'
+	if [ -d $(CURDIR)/$(UBOOT_CACHE_DIR)/u-boot.git ]; then \
+		git -C $(CURDIR)/$(UBOOT_CACHE_DIR) fetch; \
+	else \
+		git -C $(CURDIR)/$(UBOOT_CACHE_DIR) \
+			clone \
+			--bare \
+			--depth=$(CLONE_DEPTH) \
+			--single-branch \
+			--branch $(UBOOT_BRANCH) \
+			$(UBOOT_REPO); \
+	fi
 else
 	@echo "UBOOT_REPO not set - skipping"
 endif
@@ -73,16 +79,17 @@ endif
 fetch-rockchip-tpl:
 ifdef ROCKCHIP_TPL_REPO
 	mkdir -p $(CURDIR)/$(ROCKCHIP_TPL_CACHE_DIR); \
-	podman run --rm -it \
-		-v $(CURDIR)/$(ROCKCHIP_TPL_CACHE_DIR):/work \
-		alpian-builder \
-		/bin/sh -c 'if [ -d $(ROCKCHIP_TPL_DIR)/rkbin ]; then \
-			git -C $(ROCKCHIP_TPL_DIR)/rkbin fetch origin && \
-			git -C $(ROCKCHIP_TPL_DIR)/rkbin reset --hard master && \
-			git -C $(ROCKCHIP_TPL_DIR)/rkbin clean -fdx; \
-		else \
-			git clone --branch master $(ROCKCHIP_TPL_REPO) $(ROCKCHIP_TPL_DIR)/rkbin; \
-		fi'
+	if [ -d $(CURDIR)/$(ROCKCHIP_TPL_CACHE_DIR)/rkbin.git ]; then \
+		git -C $(CURDIR)/$(ROCKCHIP_CACHE_DIR) fetch; \
+	else \
+		git -C $(CURDIR)/$(ROCKCHIP_TPL_CACHE_DIR) \
+			clone \
+			--bare \
+			--depth=$(CLONE_DEPTH) \
+			--single-branch \
+			--branch $(ROCKCHIP_TPL_BRANCH) \
+			$(ROCKCHIP_TPL_REPO); \
+	fi
 else
 	@echo "ROCKCHIP_TPL_REPO not set - skipping"
 endif

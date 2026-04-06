@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/sh -x
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Ian Spray
 #
@@ -15,7 +15,7 @@ OUT_DIR="/out"
 
 source "${BOARDS_DIR}/${BOARD}/${BOARD}.env"
 
-LINUX_SRC="${CACHE_DIR}/linux/${KERNEL_DIR}/kernel"
+LINUX_SRC="${CACHE_DIR}/linux/${KERNEL_DIR}"
 LINUX_CFG="${BOARDS_DIR}/${BOARD}/linux.config"
 UBOOT_SRC="${CACHE_DIR}/u-boot/${UBOOT_DIR}/u-boot"
 UBOOT_CFG="${BOARDS_DIR}/${BOARD}/u-boot.config"
@@ -82,16 +82,15 @@ build_linux() {
   if [ -z ${KERNEL_REPO} ]; then
     return
   fi
-  mkdir -p ${WORK}/linux
+  mkdir -p ${WORK_DIR}/linux
   cd "${LINUX_SRC}"
-  make mrproper
-  make O=${WORK}/linux clean
+  make O=${WORK_DIR}/linux clean
   # take the preferred defaults
-  cp "${LINUX_CFG}" ${WORK}/linux/.config
+  cp "${LINUX_CFG}" ${WORK_DIR}/linux/.config
   # fold in any new options with sensible defaults
-  make O=${WORK}/linux olddefconfig
+  make O=${WORK_DIR}/linux olddefconfig
   # build the kernel, dtb and modules
-  make O=${WORK}/linux -j$(nproc) Image dtbs modules
+  make O=${WORK_DIR}/linux -j$(nproc) Image dtbs modules
   # construct our own DTB
   cp "${BOARDS}/${BOARD}/${BOARD}.dts" .
   # perform any cpp preprocessing of the DTS
@@ -106,7 +105,7 @@ build_linux() {
   echo make modules_install
   # show any new options and their defaults
   echo "--- new linux kernel config entries and defaults: ---"
-  make O=${WORK}/u-boot listnewconfig
+  make O=${WORK_DIR}/u-boot listnewconfig
   echo "--- new kernel config ends ---"
   cd -
 }
@@ -116,24 +115,24 @@ build_uboot() {
   if [ -z ${UBOOT_REPO} ]; then
     return
   fi
-  mkdir -p ${WORK}/u-boot
+  mkdir -p ${WORK_DIR}/u-boot
   cd "${UBOOT_SRC}"
   make mrproper
-  make O=${WORK}/u-boot clean
+  make O=${WORK_DIR}/u-boot clean
   # take the preferred defaults
-  cp "${UBOOT_CFG}" ${WORK}/u-boot/.config
+  cp "${UBOOT_CFG}" ${WORK_DIR}/u-boot/.config
   # fold in any new options with sensible defaults
-  make O=${WORK}/u-boot olddefconfig
+  make O=${WORK_DIR}/u-boot olddefconfig
   # build u-boot
   # FIXME: this test is poor and needs improvement
   if [ ! -z ${ROCKCHIP_TPL_FILE} ]; then
-    make O=${WORK}/u-boot -j$(nproc) ROCKCHIP_TPL=${TPL_SRC}/${ROCKCHIP_TPL_FILE} BL31=${TPL_SRC}/${ROCKCHIP_BL31_FILE}
+    make O=${WORK_DIR}/u-boot -j$(nproc) ROCKCHIP_TPL=${TPL_SRC}/${ROCKCHIP_TPL_FILE} BL31=${TPL_SRC}/${ROCKCHIP_BL31_FILE}
   else
-    make O=${WORK}/u-boot -j$(nproc)
+    make O=${WORK_DIR}/u-boot -j$(nproc)
   fi
   # show any new options and their defaults
   echo "--- new u-boot config entries and defaults: ---"
-  make O=${WORK}/u-boot listnewconfig
+  make O=${WORK_DIR}/u-boot listnewconfig
   echo "--- new u-boot config ends ---"
   cd -
 }
@@ -200,7 +199,7 @@ build_image() {
   genimage \
     --rootpath ${ROOTFS}
     --tmppath /tmp/genimage \
-    --inputpath ${WORK} \
+    --inputpath ${WORK_DIR} \
     --outputpath ${OUT} \
     --config ${BOARDS_DIR}/${BOARD}/genimage.${BOARD}
 }

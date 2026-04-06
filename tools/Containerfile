@@ -28,8 +28,7 @@ RUN apk update && \
     git \
     rsync \
     curl \
-    wget \
-    linux-lts
+    wget
 
 RUN addgroup builder && \
     adduser -h /home/builder -G builder -D builder && \
