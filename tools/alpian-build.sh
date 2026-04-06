@@ -1,4 +1,4 @@
-#!/bin/sh -x
+#!/bin/sh
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Ian Spray
 #
@@ -10,16 +10,17 @@ ALPINE_VER="v3.23"
 CACHE_DIR="/cache"
 BOARDS_DIR="/boards"
 BUILD_DIR="/build"
+SRC_DIR="/src"
 WORK_DIR="/work"
 OUT_DIR="/out"
 
 source "${BOARDS_DIR}/${BOARD}/${BOARD}.env"
 
-LINUX_SRC="${CACHE_DIR}/linux/${KERNEL_DIR}"
+LINUX_GIT="${CACHE_DIR}/linux/radxa/kernel.git"
 LINUX_CFG="${BOARDS_DIR}/${BOARD}/linux.config"
-UBOOT_SRC="${CACHE_DIR}/u-boot/${UBOOT_DIR}/u-boot"
+UBOOT_GIT="${CACHE_DIR}/u-boot/u-boot.git"
 UBOOT_CFG="${BOARDS_DIR}/${BOARD}/u-boot.config"
-TPL_SRC="${CACHE_DIR}/rockchip-tpl"
+TPL_GIT="${CACHE_DIR}/rockchip-tpl/rkbin.git"
 APORTS_SRC="${BUILD_DIR}/aports"
 
 ROOTFS="${WORK_DIR}/rootfs"
@@ -82,17 +83,22 @@ build_linux() {
   if [ -z ${KERNEL_REPO} ]; then
     return
   fi
-  mkdir -p ${WORK_DIR}/linux
-  cd "${LINUX_SRC}"
-  make O=${WORK_DIR}/linux clean
+  mkdir -p ${SRC_DIR}/linux
+  cd "${SRC_DIR}/linux"
+  if [ ! -d kernel ]; then
+    git clone --single-branch --branch ${KERNEL_BRANCH} ${LINUX_GIT}
+  fi
+  cd -
+  cd "${SRC_DIR}/linux/kernel"
+  make clean
   # take the preferred defaults
-  cp "${LINUX_CFG}" ${WORK_DIR}/linux/.config
+  cp "${LINUX_CFG}" .config
   # fold in any new options with sensible defaults
-  make O=${WORK_DIR}/linux olddefconfig
-  # build the kernel, dtb and modules
-  make O=${WORK_DIR}/linux -j$(nproc) Image dtbs modules
+  make olddefconfig
+  # build the kernel
+  make -j$(nproc)
   # construct our own DTB
-  cp "${BOARDS}/${BOARD}/${BOARD}.dts" .
+  cp "${BOARDS_DIR}/${BOARD}/${BOARD}.dts" .
   # perform any cpp preprocessing of the DTS
   cpp -nostdinc \
     -I arch/arm64/boot/dts \
@@ -105,8 +111,21 @@ build_linux() {
   echo make modules_install
   # show any new options and their defaults
   echo "--- new linux kernel config entries and defaults: ---"
-  make O=${WORK_DIR}/u-boot listnewconfig
+  make listnewconfig
   echo "--- new kernel config ends ---"
+  cd -
+}
+
+unpack_rockchip_tpl() {
+  echo "unpack_rockchip_tpl()"
+  if [ -z ${ROCKCHIP_TPL_REPO} ]; then
+    return
+  fi
+  mkdir -p ${SRC_DIR}/rockchip-tpl
+  cd "${SRC_DIR}/rockchip-tpl"
+  if [ ! -d rkbin ]; then
+    git clone --single-branch --branch ${ROCKCHIP_TPL_BRANCH} ${TPL_GIT}
+  fi
   cd -
 }
 
@@ -115,24 +134,29 @@ build_uboot() {
   if [ -z ${UBOOT_REPO} ]; then
     return
   fi
-  mkdir -p ${WORK_DIR}/u-boot
-  cd "${UBOOT_SRC}"
+  mkdir -p ${SRC_DIR}/u-boot
+  cd "${SRC_DIR}/u-boot"
+  if [ ! -d u-boot ]; then
+    git clone --single-branch --branch ${UBOOT_BRANCH} ${UBOOT_GIT}
+  fi
+  cd -
+  cd "${SRC_DIR}/u-boot/u-boot"
   make mrproper
-  make O=${WORK_DIR}/u-boot clean
+  make clean
   # take the preferred defaults
-  cp "${UBOOT_CFG}" ${WORK_DIR}/u-boot/.config
+  cp "${UBOOT_CFG}" .config
   # fold in any new options with sensible defaults
-  make O=${WORK_DIR}/u-boot olddefconfig
+  make olddefconfig
   # build u-boot
   # FIXME: this test is poor and needs improvement
   if [ ! -z ${ROCKCHIP_TPL_FILE} ]; then
-    make O=${WORK_DIR}/u-boot -j$(nproc) ROCKCHIP_TPL=${TPL_SRC}/${ROCKCHIP_TPL_FILE} BL31=${TPL_SRC}/${ROCKCHIP_BL31_FILE}
+    make -j$(nproc) ROCKCHIP_TPL=${SRC_DIR}/rockchip-tpl/${ROCKCHIP_TPL_FILE} BL31=${SRC_DIR}/rockchip-tpl/${ROCKCHIP_BL31_FILE}
   else
-    make O=${WORK_DIR}/u-boot -j$(nproc)
+    make -j$(nproc)
   fi
   # show any new options and their defaults
   echo "--- new u-boot config entries and defaults: ---"
-  make O=${WORK_DIR}/u-boot listnewconfig
+  make listnewconfig
   echo "--- new u-boot config ends ---"
   cd -
 }
@@ -209,6 +233,7 @@ build_image() {
 #
 setup_builder
 build_aports
+unpack_rockchip_tpl
 build_uboot
 build_linux
 build_rootfs

@@ -58,5 +58,5 @@ echo "$pkgs" | while read -r p; do
 done
 
 echo ""
-echo "Cached $( echo $pkgs | wc -l ) APKs in ${APK_CACHE})"
+echo "Cached $( cat ${APK_LIST} | wc -l ) APKs in ${APK_CACHE})"
 

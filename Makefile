@@ -6,6 +6,7 @@ CACHE_DIR              ?= cache
 APK_CACHE_DIR          ?= $(CACHE_DIR)/apk-cache
 APK_LIST               ?= $(CACHE_DIR)/apklist.txt
 LINUX_CACHE_DIR        ?= $(CACHE_DIR)/linux/$(KERNEL_DIR)
+BUILD_VOLUME           ?= alpian-build-volume
 UBOOT_CACHE_DIR        ?= $(CACHE_DIR)/u-boot
 ROCKCHIP_TPL_CACHE_DIR ?= $(CACHE_DIR)/rockchip-tpl
 SCAN_DIRS              ?= .
@@ -15,7 +16,7 @@ BOARD		       ?= e25
 
 include boards/$(BOARD)/$(BOARD).env
 
-.PHONY: build-tools image build build-linux build-uboot build-rootfs build-bootfs fetch fetch-apk fetch-linux fetch-uboot fetch-rockchip-tpl clean help abuild-keys
+.PHONY: build-volume build-tools image build build-linux build-uboot build-rootfs build-bootfs fetch fetch-apk fetch-linux fetch-uboot fetch-rockchip-tpl clean help abuild-keys
 
 # Scan Containerfiles and shell scripts in SCAN_DIRS, resolve deps, download .apk files.
 fetch-apk:
@@ -41,6 +42,11 @@ build/aports/abuild.rsa.pub: build/aports/abuild.rsa
 	openssl rsa -in build/aports/abuild.rsa -pubout -out build/aports/abuild.rsa.pub
 
 abuild-keys: build/aports/abuild.rsa build/aports/abuild.rsa.pub
+
+cache/apklist.txt: fetch-apk
+
+build-volume:
+	podman volume exists $(BUILD_VOLUME) || podman volume create $(BUILD_VOLUME)
 
 # - - - - - -
 
@@ -105,11 +111,12 @@ fetch: fetch-apk fetch-linux fetch-uboot fetch-rockchip-tpl
 # build the new system (NB: may be better to break this out into multiple
 # stages for easier tinkering, but happening inside a single container
 # invocation makes it easier to debug to begin with)
-build: build-tools fetch-linux fetch-uboot fetch-rockchip-tpl
+build: build-tools fetch-linux fetch-uboot fetch-rockchip-tpl build-volume
 	podman run --rm -it \
 		-v $(CURDIR)/cache:/cache \
 		-v $(CURDIR)/boards:/boards:ro \
 		-v $(CURDIR)/cache/apk-cache:/etc/apk/cache \
+		-v $(BUILD_VOLUME):/src \
 		-v $(CURDIR)/build:/build \
 		-v $(CURDIR)/out:/out \
 		-e BOARD=$(BOARD) \
@@ -126,6 +133,7 @@ clean:
 # tidy up both the build tooling and all local caches (ie: revert to a clean
 # 'just checked out' state)
 distclean: clean
+	podman volume rm -f $(BUILD_VOLUME) \
 	rm -rf $(APK_CACHE_DIR) $(LINUX_CACHE_DIR) $(UBOOT_CACHE_DIR) build/aports/abuild.rsa build/aports/abuild.rsa.pub
 
 # FIXME: ALL OF THE HELP TEXT IS INCORRECT
